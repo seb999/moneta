@@ -8,5 +8,13 @@
   "Taskman": {
     "BaseUrl": "https://taskman.eionet.europa.eu",
     "ApiKey": "<your-redmine-api-key>"
+  },
+  "OpenAI": {
+    "ApiKey": "<your-openai-api-key>",
+    "BaseUrl": "https://api.openai.com/v1",
+    "Model": "gpt-4o"
+  },
+  "TaskmanMcp": {
+    "Url": "https://redmine-mcp.dspx.eu/mcp"
   }
 }

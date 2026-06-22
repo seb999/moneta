@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+builder.Services.AddHttpClient(); // default + named clients for chat/MCP
 
 builder.Services.AddDbContext<MonetaDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")

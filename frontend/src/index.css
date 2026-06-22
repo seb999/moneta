@@ -225,3 +225,9 @@ tr:hover td { background: #fafbfd; }
 .text-muted { color: var(--clr-muted); }
 .text-sm { font-size: 12px; }
 .flex-gap { display: flex; gap: 8px; align-items: center; }
+
+/* Chat panel animations */
+@keyframes chat-pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes chat-bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+.chat-dot-pulse { animation: chat-pulse 1.2s ease-in-out infinite; }
+.chat-dot-bounce { animation: chat-bounce 1.2s ease-in-out infinite; }

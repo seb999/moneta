@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { getFiscalYears } from '../api/client'
 import { useYear } from '../contexts/YearContext'
+import ChatPanel from './ChatPanel'
 
 export default function Layout() {
   const { year, setYear } = useYear()
@@ -58,6 +59,7 @@ export default function Layout() {
       <main className="main">
         <Outlet />
       </main>
+      <ChatPanel />
     </div>
   )
 }
