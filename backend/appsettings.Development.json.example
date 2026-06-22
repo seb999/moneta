@@ -1,0 +1,12 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "Taskman": {
+    "BaseUrl": "https://taskman.eionet.europa.eu",
+    "ApiKey": "<your-redmine-api-key>"
+  }
+}

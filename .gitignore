@@ -1,0 +1,36 @@
+# ── Secrets / local config ───────────────────────────────────────────────
+backend/appsettings.Development.json
+**/.env
+**/.env.local
+*.user
+
+# ── .NET ─────────────────────────────────────────────────────────────────
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+
+# ── Database files (local data) ──────────────────────────────────────────
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# ── Frontend ─────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Reference app (separate project, not part of Moneta) ─────────────────
+Taskman/
+
+# ── Misc / scratch ───────────────────────────────────────────────────────
+test.txt
+
+# ── OS / editor ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
