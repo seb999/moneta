@@ -71,6 +71,8 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
         {
             e.HasOne(x => x.PaymentRef).WithMany(p => p.TaskmanCosts)
                 .HasForeignKey(x => x.PaymentRefId).IsRequired(false);
+            // One row per Taskman time entry — guarantees idempotent ingestion
+            e.HasIndex(x => x.ExternalRef).IsUnique();
         });
 
         model.Entity<TaskmanProject>(e =>

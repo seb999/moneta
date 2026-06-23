@@ -78,6 +78,10 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             foreach (var e in entries) allEntries.Add((pid, e));
         }
 
+        // Guard against the same time entry being processed twice in one run
+        // (e.g. a project resolved more than once) — dedupe by Taskman entry id.
+        var seenEntryIds = new HashSet<int>();
+
         // Auto-create any payment_ref_id seen in Taskman that doesn't exist locally yet
         var newRefIds = allEntries
             .Select(x => x.Entry.PaymentRefId)
@@ -100,6 +104,7 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
 
         foreach (var (_, entry) in allEntries)
         {
+            if (!seenEntryIds.Add(entry.Id)) continue; // already handled this entry this run
             entriesProcessed++;
             string refId = entry.PaymentRefId;
 

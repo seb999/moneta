@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Moneta.Api.Infrastructure;
 
@@ -10,9 +11,11 @@ using Moneta.Api.Infrastructure;
 namespace Moneta.Api.Migrations
 {
     [DbContext(typeof(MonetaDbContext))]
-    partial class MonetaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260623081031_UniqueTaskmanCostExternalRef")]
+    partial class UniqueTaskmanCostExternalRef
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
