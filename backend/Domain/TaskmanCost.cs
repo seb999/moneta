@@ -28,6 +28,12 @@ public class TaskmanCost
     public int? PaymentRefId { get; set; }
     public string? Consultant { get; set; }
 
+    /// <summary>Resolved MPS code via (Project, Category) mapping. Null if unmapped/excluded.</summary>
+    public string? MpsCode { get; set; }
+
+    /// <summary>MPS attribution: mapped | assumed_default | excluded | unmapped.</summary>
+    public string MpsStatus { get; set; } = "unmapped";
+
     /// <summary>mapped | unmapped | excluded</summary>
     public string AttributionStatus { get; set; } = "unmapped";
     public string? ExternalRef { get; set; }

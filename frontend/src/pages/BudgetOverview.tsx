@@ -24,6 +24,8 @@ export default function BudgetOverview() {
   const [rows, setRows] = useState<PaymentRefSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hideEmpty, setHideEmpty] = useState(true)
+  const [filter, setFilter] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -34,7 +36,15 @@ export default function BudgetOverview() {
       .finally(() => setLoading(false))
   }, [year])
 
-  const totals = rows.reduce(
+  const hasActivity = (r: PaymentRefSummary) =>
+    r.caAmountEur !== 0 || r.paAmountEur !== 0 || r.committedEur !== 0 || r.spentEur !== 0
+  const visible = rows.filter(r =>
+    (!hideEmpty || hasActivity(r)) &&
+    (!filter ||
+      r.paymentRefId.toLowerCase().includes(filter.toLowerCase()) ||
+      r.description.toLowerCase().includes(filter.toLowerCase())))
+
+  const totals = visible.reduce(
     (acc, r) => ({
       ca: acc.ca + r.caAmountEur,
       pa: acc.pa + r.paAmountEur,
@@ -57,8 +67,14 @@ export default function BudgetOverview() {
         {!loading && !error && (
           <div className="card">
             <div className="card-header">
-              <h2>Payment Refs</h2>
-              <span className="text-muted text-sm">{rows.length} refs</span>
+              <h2>Payment Refs <span className="text-muted text-sm" style={{ fontWeight: 400 }}>({visible.length} of {rows.length})</span></h2>
+              <div className="flex-gap">
+                <input style={{ width: 220 }} placeholder="Filter ref / description…" value={filter} onChange={e => setFilter(e.target.value)} />
+                <label className="flex-gap text-sm" style={{ margin: 0, cursor: 'pointer', fontWeight: 400 }}>
+                  <input type="checkbox" checked={hideEmpty} onChange={e => setHideEmpty(e.target.checked)} style={{ width: 'auto' }} />
+                  Hide empty
+                </label>
+              </div>
             </div>
             <div className="table-wrap">
               <table>
@@ -76,13 +92,15 @@ export default function BudgetOverview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.length === 0 ? (
+                  {visible.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="empty-state">
-                        No payment refs for {year}. Add payment refs and appropriations to get started.
+                        {rows.length === 0
+                          ? `No payment refs for ${year}. Add payment refs and appropriations to get started.`
+                          : 'No payment refs match. Try clearing the filter or unchecking “Hide empty”.'}
                       </td>
                     </tr>
-                  ) : rows.map(r => (
+                  ) : visible.map(r => (
                     <tr key={r.id}>
                       <td>
                         <span className="code-badge" style={{ fontFamily: 'monospace', fontSize: 11 }}>
@@ -100,7 +118,7 @@ export default function BudgetOverview() {
                     </tr>
                   ))}
                 </tbody>
-                {rows.length > 1 && (
+                {visible.length > 1 && (
                   <tfoot>
                     <tr style={{ fontWeight: 700, borderTop: '2px solid var(--clr-border)' }}>
                       <td colSpan={2} className="text-muted" style={{ fontSize: 12 }}>TOTAL</td>

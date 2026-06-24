@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient(); // default + named clients for chat/MCP
+builder.Services.AddHttpContextAccessor(); // lets RedmineClient read the per-user Taskman key
 
 builder.Services.AddDbContext<MonetaDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")
@@ -15,12 +16,13 @@ builder.Services.AddDbContext<MonetaDbContext>(options =>
 builder.Services.AddHttpClient<IRedmineClient, RedmineClient>(client =>
 {
     var baseUrl = builder.Configuration["Taskman:BaseUrl"] ?? "https://taskman.eionet.europa.eu";
-    var apiKey = builder.Configuration["Taskman:ApiKey"] ?? "";
     client.BaseAddress = new Uri(baseUrl);
-    client.DefaultRequestHeaders.Add("X-Redmine-API-Key", apiKey);
+    // The X-Redmine-API-Key header is set per request in RedmineClient (user key or default)
 });
 
 builder.Services.AddScoped<ICostIngestionService, CostIngestionService>();
+builder.Services.AddScoped<IMpsImportService, MpsImportService>();
+builder.Services.AddScoped<IInvoiceExtractionService, InvoiceExtractionService>();
 
 builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>

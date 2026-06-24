@@ -16,6 +16,8 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
     public DbSet<TaskmanProject> TaskmanProjects => Set<TaskmanProject>();
     public DbSet<Contractor> Contractors => Set<Contractor>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
+    public DbSet<MpsCode> MpsCodes => Set<MpsCode>();
+    public DbSet<CategoryMpsMap> CategoryMpsMaps => Set<CategoryMpsMap>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -63,8 +65,6 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
         {
             e.HasOne(x => x.Invoice).WithMany(i => i.Lines)
                 .HasForeignKey(x => x.InvoiceId);
-            e.HasOne(x => x.PaymentRef).WithMany()
-                .HasForeignKey(x => x.PaymentRefId).IsRequired(false);
         });
 
         model.Entity<TaskmanCost>(e =>
@@ -83,6 +83,16 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
         model.Entity<RateCard>(e =>
         {
             e.HasIndex(x => new { x.Company, x.Profile }).IsUnique();
+        });
+
+        model.Entity<MpsCode>(e =>
+        {
+            e.HasIndex(x => new { x.FiscalYear, x.Code }).IsUnique();
+        });
+
+        model.Entity<CategoryMpsMap>(e =>
+        {
+            e.HasIndex(x => new { x.FiscalYear, x.TaskmanProject, x.TaskmanCategory }).IsUnique();
         });
     }
 }

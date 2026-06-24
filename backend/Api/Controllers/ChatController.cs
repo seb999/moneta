@@ -195,11 +195,17 @@ public class ChatController(
         await Send(new { type = "done" });
     }
 
-    /// <summary>MCP HttpClient with bearer auth (uses TaskmanMcp:ApiKey, falling back to the Taskman key).</summary>
+    /// <summary>
+    /// MCP HttpClient with bearer auth. Uses the per-user key from the
+    /// X-Taskman-Key header when present; otherwise falls back to the configured key.
+    /// </summary>
     private HttpClient CreateMcpClient()
     {
         var client = httpFactory.CreateClient("mcp");
-        var token = config["TaskmanMcp:ApiKey"] ?? config["Taskman:ApiKey"];
+        var userKey = Request.Headers["X-Taskman-Key"].FirstOrDefault();
+        var token = !string.IsNullOrWhiteSpace(userKey)
+            ? userKey
+            : config["TaskmanMcp:ApiKey"] ?? config["Taskman:ApiKey"];
         if (!string.IsNullOrWhiteSpace(token))
             client.DefaultRequestHeaders.Authorization = new("Bearer", token);
         return client;

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Moneta.Api.Infrastructure;
 
@@ -10,9 +11,11 @@ using Moneta.Api.Infrastructure;
 namespace Moneta.Api.Migrations
 {
     [DbContext(typeof(MonetaDbContext))]
-    partial class MonetaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260623122006_MpsReferenceData")]
+    partial class MpsReferenceData
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -271,21 +274,23 @@ namespace Moneta.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<long>("AmountCents")
+                    b.Property<long>("ClaimedAmountCents")
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Hours")
+                    b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("InvoiceId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("MpsCode")
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("PaymentRefId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
                     b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PaymentRefId");
 
                     b.ToTable("InvoiceLines");
                 });
@@ -399,13 +404,6 @@ namespace Moneta.Api.Migrations
                     b.Property<decimal>("Hours")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("MpsCode")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("MpsStatus")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<int?>("PaymentRefId")
                         .HasColumnType("INTEGER");
 
@@ -517,7 +515,13 @@ namespace Moneta.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                        .WithMany()
+                        .HasForeignKey("PaymentRefId");
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("PaymentRef");
                 });
 
             modelBuilder.Entity("Moneta.Api.Domain.PaymentRef", b =>

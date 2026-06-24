@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace Moneta.Api.Infrastructure;
 
@@ -10,10 +12,23 @@ public interface IRedmineClient
     Task<List<RedmineRef>> DiscoverUsersAsync(int projectId, int monthsBack = 3, CancellationToken ct = default);
 }
 
-public class RedmineClient(HttpClient http) : IRedmineClient
+public class RedmineClient : IRedmineClient
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
     private const int PageSize = 100;
+    private readonly HttpClient http;
+
+    public RedmineClient(HttpClient http, IHttpContextAccessor ctx, IConfiguration config)
+    {
+        this.http = http;
+        // Per-request key: the user's X-Taskman-Key header, else the configured default
+        var userKey = ctx.HttpContext?.Request.Headers["X-Taskman-Key"].FirstOrDefault();
+        var key = !string.IsNullOrWhiteSpace(userKey) ? userKey : config["Taskman:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(key))
+            http.DefaultRequestHeaders.Remove("X-Redmine-API-Key");
+        if (!string.IsNullOrWhiteSpace(key))
+            http.DefaultRequestHeaders.Add("X-Redmine-API-Key", key);
+    }
 
     public async Task<List<RedmineProject>> GetProjectsAsync(CancellationToken ct = default)
     {

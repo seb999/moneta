@@ -6,9 +6,11 @@ import PaymentRefs from './pages/PaymentRefs'
 import Appropriations from './pages/Appropriations'
 import Commitments from './pages/Commitments'
 import Actuals from './pages/Actuals'
+import Invoices from './pages/Invoices'
 import Ingestion from './pages/Ingestion'
 import WorkEffort from './pages/WorkEffort'
 import Contractors from './pages/Contractors'
+import MpsCodes from './pages/MpsCodes'
 import FiscalYears from './pages/FiscalYears'
 
 export default function App() {
@@ -22,9 +24,11 @@ export default function App() {
             <Route path="appropriations" element={<Appropriations />} />
             <Route path="commitments" element={<Commitments />} />
             <Route path="actuals" element={<Actuals />} />
+            <Route path="invoices" element={<Invoices />} />
             <Route path="ingestion" element={<Ingestion />} />
             <Route path="work-effort" element={<WorkEffort />} />
             <Route path="contractors" element={<Contractors />} />
+            <Route path="mps-codes" element={<MpsCodes />} />
             <Route path="fiscal-years" element={<FiscalYears />} />
           </Route>
         </Routes>

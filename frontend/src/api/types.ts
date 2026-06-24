@@ -125,3 +125,98 @@ export interface RedmineProject {
   identifier: string
   status: number
 }
+
+export interface MpsCode {
+  id: number
+  fiscalYear: number
+  code: string
+  label: string | null
+  rollup: string | null
+}
+
+export interface CategoryMpsMap {
+  id: number
+  fiscalYear: number
+  taskmanProject: string
+  taskmanCategory: string
+  mpsCode: string | null
+  excluded: boolean
+  note: string | null
+}
+
+export interface MpsImportResult {
+  fiscalYear: number
+  mpsCodes: number
+  mappings: number
+  excluded: number
+  warnings: string[]
+}
+
+export interface UnmappedPair {
+  taskmanProject: string
+  taskmanCategory: string
+  hours: number
+  entries: number
+}
+
+export interface Invoice {
+  id: number
+  consultant: string
+  invoiceRef: string
+  fiscalYear: number
+  period: string
+  paymentRefId: number | null
+  paymentRefCode: string | null
+  claimedAmountEur: number
+  receivedDate: string
+  status: string
+  verifiedBy: string | null
+  verifiedAt: string | null
+  note: string | null
+}
+
+export interface ExtractedInvoice {
+  consultant: string | null
+  invoiceRef: string | null
+  period: string | null
+  claimedAmountEur: number | null
+  currency: string | null
+  paymentRefHint: string | null
+  notes: string | null
+  suggestedPaymentRefId: number | null
+  suggestedPaymentRefCode: string | null
+}
+
+export interface DeveloperLine {
+  developer: string
+  hours: number
+  computedEur: number
+}
+
+export interface Verification {
+  invoiceId: number
+  paymentRefCode: string | null
+  period: string
+  claimedEur: number
+  computedEur: number
+  varianceEur: number
+  totalHours: number
+  breakdown: DeveloperLine[]
+}
+
+export interface MpsSplitLine {
+  mpsCode: string
+  hours: number
+  sharePct: number
+  amountEur: number
+}
+
+export interface Split {
+  invoiceId: number
+  paymentRefCode: string | null
+  period: string
+  claimedEur: number
+  mappedHours: number
+  unmappedHours: number
+  lines: MpsSplitLine[]
+}

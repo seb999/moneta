@@ -1,9 +1,15 @@
-import type { Appropriation, Actual, Commitment, Contractor, DiscoveredUser, FiscalYear, IngestSummary, MonthlySummaryRow, PaymentRef, PaymentRefSummary, RateCard, RedmineProject, TaskmanCost } from './types'
+import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
+import { getTaskmanKey } from './taskmanKey'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const key = getTaskmanKey()
   const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(key ? { 'X-Taskman-Key': key } : {}),
+      ...init?.headers,
+    },
   })
   if (!res.ok) {
     const text = await res.text()
@@ -139,4 +145,57 @@ export const getTaskmanCosts = (year?: number, period?: string, paymentRefId?: n
   if (period) params.set('period', period)
   if (paymentRefId) params.set('paymentRefId', String(paymentRefId))
   return request<TaskmanCost[]>(`/ingestion/taskman-costs?${params}`)
+}
+
+// MPS reference data
+export const getMpsCodes = (year: number) => request<MpsCode[]>(`/mps/codes?year=${year}`)
+export const getMpsMappings = (year: number) => request<CategoryMpsMap[]>(`/mps/mappings?year=${year}`)
+export const createMpsMapping = (data: { fiscalYear: number; taskmanProject: string; taskmanCategory: string | null; mpsCode: string | null; excluded: boolean; note: string | null }) =>
+  request<CategoryMpsMap>('/mps/mappings', { method: 'POST', body: JSON.stringify(data) })
+export const updateMpsMapping = (id: number, data: { fiscalYear: number; taskmanProject: string; taskmanCategory: string | null; mpsCode: string | null; excluded: boolean; note: string | null }) =>
+  request<void>(`/mps/mappings/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+export const deleteMpsMapping = (id: number) =>
+  request<void>(`/mps/mappings/${id}`, { method: 'DELETE' })
+export const getMpsUnmapped = (year: number) => request<UnmappedPair[]>(`/mps/unmapped?year=${year}`)
+export const importMpsBundled = (year: number) =>
+  request<MpsImportResult>(`/mps/import-bundled?year=${year}`, { method: 'POST' })
+export const importMpsFile = async (year: number, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('year', String(year))
+  const res = await fetch('/api/mps/import', { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+  return res.json() as Promise<MpsImportResult>
+}
+
+// Invoices (M3 — verification)
+export const getInvoices = (year?: number, status?: string) => {
+  const p = new URLSearchParams()
+  if (year) p.set('year', String(year))
+  if (status) p.set('status', status)
+  return request<Invoice[]>(`/invoices?${p}`)
+}
+export const createInvoice = (data: {
+  consultant: string; invoiceRef: string; fiscalYear: number; period: string
+  paymentRefId: number; claimedAmountEur: number; receivedDate?: string; note?: string
+}) => request<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) })
+export const deleteInvoice = (id: number) => request<void>(`/invoices/${id}`, { method: 'DELETE' })
+export const getVerification = (id: number) => request<Verification>(`/invoices/${id}/verification`)
+export const verifyInvoice = (id: number, data: { verifiedBy?: string; note?: string }) =>
+  request<void>(`/invoices/${id}/verify`, { method: 'POST', body: JSON.stringify(data) })
+export const disputeInvoice = (id: number, data: { verifiedBy?: string; note?: string }) =>
+  request<void>(`/invoices/${id}/dispute`, { method: 'POST', body: JSON.stringify(data) })
+export const getSplit = (id: number) => request<Split>(`/invoices/${id}/split`)
+export const getInvoiceLines = (id: number) => request<MpsSplitLine[]>(`/invoices/${id}/lines`)
+export const extractInvoice = async (file: File, year?: number) => {
+  const form = new FormData()
+  form.append('file', file)
+  const key = getTaskmanKey()
+  const res = await fetch(`/api/invoices/extract${year ? `?year=${year}` : ''}`, {
+    method: 'POST',
+    body: form,
+    headers: key ? { 'X-Taskman-Key': key } : undefined,
+  })
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`)
+  return res.json() as Promise<ExtractedInvoice>
 }

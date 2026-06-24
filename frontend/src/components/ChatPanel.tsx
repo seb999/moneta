@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { getTaskmanKey, subscribeTaskmanKey } from '../api/taskmanKey'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -84,8 +85,10 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([])
   const [rawHistory, setRawHistory] = useState<unknown[]>([])
   const [loading, setLoading] = useState(false)
+  const [taskmanKey, setTaskmanKeyState] = useState(getTaskmanKey())
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => subscribeTaskmanKey(setTaskmanKeyState), [])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
 
   async function handleSend() {
@@ -101,9 +104,11 @@ export default function ChatPanel() {
     const body = rawHistory.length > 0 ? { messages: history, rawHistory } : { messages: history }
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (taskmanKey) headers['X-Taskman-Key'] = taskmanKey
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       })
       if (!res.ok || !res.body) {

@@ -38,6 +38,18 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             r => (r.Company, r.Profile),
             r => r);
 
+        // Category → MPS mapping for this year. Two lookups:
+        //   exact (project, category)  and  project-default (project, "")
+        var maps = await db.CategoryMpsMaps.Where(m => m.FiscalYear == fiscalYear).ToListAsync(ct);
+        var mapExact = maps
+            .Where(m => m.TaskmanCategory != "")
+            .GroupBy(m => (m.TaskmanProject, m.TaskmanCategory))
+            .ToDictionary(g => g.Key, g => g.First());
+        var mapProjectDefault = maps
+            .Where(m => m.TaskmanCategory == "")
+            .GroupBy(m => m.TaskmanProject)
+            .ToDictionary(g => g.Key, g => g.First());
+
         // Which Redmine projects to pull
         List<int> projectIds;
         if (projectId.HasValue)
@@ -76,6 +88,18 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             try { entries = await redmine.GetTimeEntriesAsync(pid, from, to, ct); }
             catch (Exception ex) { warnings.Add($"Project {pid}: failed to fetch — {ex.Message}"); continue; }
             foreach (var e in entries) allEntries.Add((pid, e));
+        }
+
+        // Batch-fetch issue Categories for MPS resolution (only if a mapping exists)
+        Dictionary<int, RedmineIssue> issueCache = [];
+        if (maps.Count > 0)
+        {
+            var issueIds = allEntries
+                .Where(x => x.Entry.Issue is not null)
+                .Select(x => x.Entry.Issue!.Id)
+                .Distinct();
+            try { issueCache = await redmine.GetIssuesByIdsAsync(issueIds, ct); }
+            catch (Exception ex) { warnings.Add($"Could not fetch issue categories — MPS left unmapped: {ex.Message}"); }
         }
 
         // Guard against the same time entry being processed twice in one run
@@ -136,6 +160,12 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                 string? consultant = contractor?.Company;
                 string externalRef = $"taskman:{entry.Id}";
 
+                // Resolve the issue Category, then the MPS code via the mapping
+                string category = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var iss)
+                    ? iss.Category?.Name ?? ""
+                    : "";
+                var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Name, category, mapExact, mapProjectDefault);
+
                 var existing = await db.TaskmanCosts
                     .FirstOrDefaultAsync(t => t.ExternalRef == externalRef, ct);
 
@@ -146,13 +176,15 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                         FiscalYear        = fiscalYear,
                         Period            = period,
                         TaskmanProject    = entry.Project.Name,
-                        TaskmanCategory   = "",
+                        TaskmanCategory   = category,
                         Developer         = entry.User.Name,
                         TaskmanUserId     = entry.User.Id,
                         Hours             = entry.Hours,
                         ComputedAmountCents = computedCents,
                         PaymentRefId      = paymentRefDbId,
                         Consultant        = consultant,
+                        MpsCode           = mpsCode,
+                        MpsStatus         = mpsStatus,
                         AttributionStatus = attributionStatus,
                         ExternalRef       = externalRef,
                     });
@@ -166,6 +198,9 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                     existing.ComputedAmountCents = computedCents;
                     existing.PaymentRefId       = paymentRefDbId;
                     existing.Consultant         = consultant;
+                    existing.TaskmanCategory    = category;
+                    existing.MpsCode            = mpsCode;
+                    existing.MpsStatus          = mpsStatus;
                     existing.AttributionStatus  = attributionStatus;
                 }
 
@@ -180,6 +215,26 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
         await db.SaveChangesAsync(ct);
 
         return new IngestSummaryDto(period, entriesProcessed, mapped, 0, unmapped, excluded, totalCents / 100m, warnings);
+    }
+
+    /// <summary>
+    /// Resolve (Project, Category) → (mpsCode, status) with fallback:
+    /// exact match → project default (blank category) → unmapped.
+    /// Returns status: mapped | assumed_default | excluded | unmapped.
+    /// </summary>
+    private static (string? Code, string Status) ResolveMps(
+        string project, string category,
+        Dictionary<(string, string), Domain.CategoryMpsMap> exact,
+        Dictionary<string, Domain.CategoryMpsMap> projectDefault)
+    {
+        if (!string.IsNullOrEmpty(category) && exact.TryGetValue((project, category), out var m))
+            return m.Excluded ? (null, "excluded") : (m.MpsCode, "mapped");
+
+        // Blank or unmapped category → project-level default
+        if (projectDefault.TryGetValue(project, out var def))
+            return def.Excluded ? (null, "excluded") : (def.MpsCode, "assumed_default");
+
+        return (null, "unmapped");
     }
 
     private static long ComputeCents(
