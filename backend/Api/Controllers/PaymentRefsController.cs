@@ -8,8 +8,52 @@ namespace Moneta.Api.Controllers;
 
 [ApiController]
 [Route("api/payment-refs")]
-public class PaymentRefsController(MonetaDbContext db) : ControllerBase
+public class PaymentRefsController(MonetaDbContext db, IRedmineClient redmine) : ControllerBase
 {
+    /// <summary>
+    /// Scans time entries for a specific Taskman project and fiscal year,
+    /// collects distinct Payment Reference ID values, and auto-creates any missing ones.
+    /// </summary>
+    [HttpPost("sync-from-taskman")]
+    public async Task<ActionResult<SyncPaymentRefsResult>> SyncFromTaskman(
+        [FromQuery] int year, [FromQuery] int projectId, CancellationToken ct)
+    {
+        if (!await db.FiscalYears.AnyAsync(y => y.Year == year, ct))
+            return BadRequest($"Fiscal year {year} does not exist.");
+
+        var from = new DateOnly(year, 1, 1);
+        var to   = new DateOnly(year, 12, 31);
+
+        List<RedmineTimeEntry> entries;
+        try { entries = await redmine.GetTimeEntriesAsync(projectId, from, to, ct); }
+        catch (HttpRequestException ex) { return StatusCode(502, $"Taskman API error: {ex.Message}"); }
+
+        var taskmanRefs = entries
+            .Select(e => e.PaymentRefId)
+            .Where(r => !string.IsNullOrWhiteSpace(r) && !r.Equals("x", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order()
+            .ToList();
+
+        var existing = await db.PaymentRefs
+            .Where(p => p.FiscalYear == year)
+            .Select(p => p.PaymentRefId)
+            .ToListAsync(ct);
+        var existingSet = existing.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var created = new List<string>();
+        foreach (var refId in taskmanRefs)
+        {
+            if (existingSet.Contains(refId)) continue;
+            db.PaymentRefs.Add(new PaymentRef { FiscalYear = year, PaymentRefId = refId, Description = "" });
+            created.Add(refId);
+        }
+        if (created.Count > 0) await db.SaveChangesAsync(ct);
+
+        return Ok(new SyncPaymentRefsResult(taskmanRefs.Count, created.Count, created));
+    }
+
+
     [HttpGet]
     public async Task<IEnumerable<PaymentRefDto>> GetAll([FromQuery] int? year)
     {

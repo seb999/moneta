@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Moneta.Api.Infrastructure;
 
@@ -10,9 +11,11 @@ using Moneta.Api.Infrastructure;
 namespace Moneta.Api.Migrations
 {
     [DbContext(typeof(MonetaDbContext))]
-    partial class MonetaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260625134432_AddCommitmentContractType")]
+    partial class AddCommitmentContractType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -269,32 +272,6 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Invoices");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.InvoiceClaimLine", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("AmountCents")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Developer")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal?>("Hours")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("InvoiceId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.ToTable("InvoiceClaimLines");
-                });
-
             modelBuilder.Entity("Moneta.Api.Domain.InvoiceLine", b =>
                 {
                     b.Property<int>("Id")
@@ -537,17 +514,6 @@ namespace Moneta.Api.Migrations
                         .HasForeignKey("PaymentRefId");
 
                     b.Navigation("PaymentRef");
-                });
-
-            modelBuilder.Entity("Moneta.Api.Domain.InvoiceClaimLine", b =>
-                {
-                    b.HasOne("Moneta.Api.Domain.Invoice", "Invoice")
-                        .WithMany()
-                        .HasForeignKey("InvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Invoice");
                 });
 
             modelBuilder.Entity("Moneta.Api.Domain.InvoiceLine", b =>

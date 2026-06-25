@@ -13,6 +13,9 @@ public class Commitment
     public string? Counterparty { get; set; }
     public string Status { get; set; } = "active"; // active | cancelled | closed
 
+    /// <summary>Contract type: TM (time &amp; means) | FP (fixed price) | QTM (quoted time &amp; materials).</summary>
+    public string ContractType { get; set; } = "TM";
+
     public PaymentRef PaymentRef { get; set; } = null!;
     public ICollection<Actual> Actuals { get; set; } = [];
 }

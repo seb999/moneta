@@ -22,7 +22,7 @@ public class TaskmanCost
     /// <summary>Hours as logged in Taskman.</summary>
     public decimal Hours { get; set; }
 
-    /// <summary>Euro-cents: hours / 8 × daily_rate.</summary>
+    /// <summary>Euro-cents: hours / 8 × daily_rate (exact, no rounding).</summary>
     public long ComputedAmountCents { get; set; }
 
     public int? PaymentRefId { get; set; }

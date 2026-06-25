@@ -1,8 +1,15 @@
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
-using Anthropic;
-using Anthropic.Models.Messages;
+using System.Text.Json.Nodes;
 
 namespace Moneta.Api.Application;
+
+/// <summary>One billed line read off the invoice (typically one per developer).</summary>
+public record ExtractedInvoiceLine(
+    string? Developer,
+    decimal? Hours,
+    decimal? AmountEur);
 
 /// <summary>Fields an LLM pulls off a consultant invoice PDF to pre-fill the intake form.</summary>
 public record ExtractedInvoice(
@@ -12,7 +19,8 @@ public record ExtractedInvoice(
     decimal? ClaimedAmountEur,
     string? Currency,
     string? PaymentRefHint,    // contract / payment-ref string seen on the invoice, to fuzzy-match
-    string? Notes);
+    string? Notes,
+    List<ExtractedInvoiceLine>? Lines = null);
 
 public interface IInvoiceExtractionService
 {
@@ -20,79 +28,115 @@ public interface IInvoiceExtractionService
     Task<ExtractedInvoice> ExtractAsync(byte[] pdfBytes, CancellationToken ct = default);
 }
 
-public class InvoiceExtractionService(IConfiguration config) : IInvoiceExtractionService
+public class InvoiceExtractionService(IConfiguration config, IHttpClientFactory httpFactory) : IInvoiceExtractionService
 {
-    readonly string? _apiKey = config["Anthropic:ApiKey"]
-        ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+    readonly string? _apiKey = config["OpenAI:ApiKey"];
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_apiKey);
 
-    // Strict JSON shape Claude must return. Nullable so the officer fills any gaps.
-    const string Schema = """
+    // JSON schema for structured output — anyOf null pattern required by OpenAI strict mode.
+    static readonly JsonObject Schema = JsonNode.Parse("""
     {
       "type": "object",
       "additionalProperties": false,
-      "required": ["consultant", "invoiceRef", "period", "claimedAmountEur", "currency", "paymentRefHint", "notes"],
+      "required": ["consultant", "invoiceRef", "period", "claimedAmountEur", "currency", "paymentRefHint", "notes", "lines"],
       "properties": {
-        "consultant":       { "type": ["string", "null"], "description": "The supplier / consulting company that issued the invoice (e.g. Tracasa, Altia)." },
-        "invoiceRef":       { "type": ["string", "null"], "description": "The invoice number / reference printed on the document." },
-        "period":           { "type": ["string", "null"], "description": "The service month the invoice covers, normalised to YYYY-MM (e.g. 2026-05). Null if not determinable." },
-        "claimedAmountEur": { "type": ["number", "null"], "description": "The total amount claimed, in euros, as a number (no currency symbol, no thousands separators)." },
-        "currency":         { "type": ["string", "null"], "description": "ISO currency code of the claimed amount (e.g. EUR)." },
-        "paymentRefHint":   { "type": ["string", "null"], "description": "Any contract, purchase-order or payment-reference identifier on the invoice (e.g. EEA/DTL/25/015/EEA.61006). Used to match a Moneta payment ref." },
-        "notes":            { "type": ["string", "null"], "description": "Anything notable for the officer: ambiguity, multiple periods, partial amounts. Null if nothing." }
+        "consultant":       { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "The supplier / consulting company that issued the invoice (e.g. Tracasa, Altia)." },
+        "invoiceRef":       { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "The invoice number / reference printed on the document." },
+        "period":           { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "The service month the invoice covers, normalised to YYYY-MM (e.g. 2026-05). Null if not determinable." },
+        "claimedAmountEur": { "anyOf": [{"type": "number"}, {"type": "null"}], "description": "The total amount claimed, in euros, as a number (no currency symbol, no thousands separators)." },
+        "currency":         { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "ISO currency code of the claimed amount (e.g. EUR)." },
+        "paymentRefHint":   { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "Any contract, purchase-order or payment-reference identifier on the invoice (e.g. EEA/DTL/25/015/EEA.61006). Used to match a Moneta payment ref." },
+        "notes":            { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "Anything notable for the officer: ambiguity, multiple periods, partial amounts. Null if nothing." },
+        "lines": {
+          "type": "array",
+          "description": "The invoice's detail lines, one object per billed row (typically one per developer/consultant). Empty array if the invoice shows no itemised detail.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["developer", "hours", "amountEur"],
+            "properties": {
+              "developer": { "anyOf": [{"type": "string"}, {"type": "null"}], "description": "The developer / person / line label this row bills for." },
+              "hours":     { "anyOf": [{"type": "number"}, {"type": "null"}], "description": "Hours (or days × 8) billed on this line, as a number. Null if not shown." },
+              "amountEur": { "anyOf": [{"type": "number"}, {"type": "null"}], "description": "The euro amount of this line, as a number (no symbol, no thousands separators)." }
+            }
+          }
+        }
       }
     }
-    """;
+    """)!.AsObject();
 
-    public async Task<ExtractedInvoice> ExtractAsync(byte[] pdfBytes, CancellationToken ct = default)
-    {
-        if (!IsConfigured)
-            throw new InvalidOperationException("Anthropic API key is not configured (Anthropic:ApiKey).");
-
-        var client = new AnthropicClient { ApiKey = _apiKey };
-        var base64 = Convert.ToBase64String(pdfBytes);
-
-        var prompt = """
+    const string Prompt = """
         You are extracting structured data from a consultant invoice (PDF) for the European Environment Agency.
         Read the document and return only the requested fields. Rules:
         - period: the month the work was performed/billed, as YYYY-MM. If a date range, use the month that the bulk of the work falls in.
         - claimedAmountEur: the headline total payable in euros. If VAT is shown, use the gross total payable unless a clearly-labelled net total is the contractual amount.
         - paymentRefHint: copy any contract / framework / payment-reference string verbatim.
+        - lines: extract every itemised detail row (usually one per developer/consultant) with its developer name, hours and euro amount. If the invoice has no itemised breakdown, return an empty array.
         - Use null for any field you cannot determine with confidence. Do not guess.
         """;
 
-        var response = await client.Messages.Create(new MessageCreateParams
+    public async Task<ExtractedInvoice> ExtractAsync(byte[] pdfBytes, CancellationToken ct = default)
+    {
+        if (!IsConfigured)
+            throw new InvalidOperationException("OpenAI API key is not configured (OpenAI:ApiKey).");
+
+        var baseUrl = (config["OpenAI:BaseUrl"] ?? "https://api.openai.com/v1").TrimEnd('/');
+        var model   = config["OpenAI:ExtractionModel"] ?? "gpt-4o";
+        var base64  = Convert.ToBase64String(pdfBytes);
+
+        var payload = new JsonObject
         {
-            Model = Model.ClaudeOpus4_8,
-            MaxTokens = 1024,
-            OutputConfig = new OutputConfig
+            ["model"] = model,
+            ["response_format"] = new JsonObject
             {
-                Format = new JsonOutputFormat
+                ["type"] = "json_schema",
+                ["json_schema"] = new JsonObject
                 {
-                    Schema = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Schema)!,
+                    ["name"]   = "extracted_invoice",
+                    ["strict"] = true,
+                    ["schema"] = Schema.DeepClone(),
                 },
             },
-            Messages =
-            [
-                new MessageParam
+            ["messages"] = new JsonArray
+            {
+                new JsonObject
                 {
-                    Role = Role.User,
-                    Content = new List<ContentBlockParam>
+                    ["role"] = "user",
+                    ["content"] = new JsonArray
                     {
-                        new DocumentBlockParam { Source = new Base64PdfSource { Data = base64 } },
-                        new TextBlockParam { Text = prompt },
+                        new JsonObject
+                        {
+                            ["type"] = "file",
+                            ["file"] = new JsonObject
+                            {
+                                ["filename"]  = "invoice.pdf",
+                                ["file_data"] = $"data:application/pdf;base64,{base64}",
+                            },
+                        },
+                        new JsonObject
+                        {
+                            ["type"] = "text",
+                            ["text"] = Prompt,
+                        },
                     },
                 },
-            ],
-        }, cancellationToken: ct);
+            },
+        };
 
-        var json = response.Content
-            .Select(b => b.Value)
-            .OfType<TextBlock>()
-            .Select(t => t.Text)
-            .FirstOrDefault();
+        var http = httpFactory.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
 
+        using var res = await http.PostAsync(
+            $"{baseUrl}/chat/completions",
+            new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
+            ct);
+
+        var body = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+            throw new InvalidOperationException($"OpenAI error {(int)res.StatusCode}: {body[..Math.Min(300, body.Length)]}");
+
+        var json = JsonNode.Parse(body)?["choices"]?[0]?["message"]?["content"]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(json))
             throw new InvalidOperationException("The model returned no content to parse.");
 

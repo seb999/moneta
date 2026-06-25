@@ -46,6 +46,7 @@ export interface Commitment {
   date: string
   counterparty?: string
   status: string
+  contractType: string
 }
 
 export interface Actual {
@@ -185,12 +186,15 @@ export interface ExtractedInvoice {
   notes: string | null
   suggestedPaymentRefId: number | null
   suggestedPaymentRefCode: string | null
+  lines: InvoiceLineInput[]
 }
 
 export interface DeveloperLine {
   developer: string
   hours: number
-  computedEur: number
+  taskmanEur: number
+  invoiceEur: number
+  diffEur: number
 }
 
 export interface Verification {
@@ -200,8 +204,16 @@ export interface Verification {
   claimedEur: number
   computedEur: number
   varianceEur: number
+  invoiceLinesTotalEur: number
+  hasInvoiceLines: boolean
   totalHours: number
   breakdown: DeveloperLine[]
+}
+
+export interface InvoiceLineInput {
+  developer: string | null
+  hours: number | null
+  amountEur: number | null
 }
 
 export interface MpsSplitLine {

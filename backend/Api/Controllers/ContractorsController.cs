@@ -110,28 +110,53 @@ public class ContractorsController(MonetaDbContext db) : ControllerBase
 
     // ── Discovery ────────────────────────────────────────────────────────────
 
-    /// <summary>Discover developers who logged time under a payment ref (from ingested data).</summary>
+    /// <summary>
+    /// Discover developers for a payment ref.
+    /// Finds which Taskman projects are linked to this ref (via prior ingestion),
+    /// then scans those projects live on Taskman to get the current developer list.
+    /// </summary>
     [HttpGet("discover-by-ref")]
-    public async Task<ActionResult<List<DiscoveredUser>>> DiscoverByRef([FromQuery] int paymentRefId, CancellationToken ct)
+    public async Task<ActionResult<List<DiscoveredUser>>> DiscoverByRef(
+        [FromQuery] int paymentRefId,
+        [FromQuery] int monthsBack = 12,
+        [FromServices] IRedmineClient redmine = null!,
+        CancellationToken ct = default)
     {
-        var devs = await db.TaskmanCosts
+        // Find which Taskman project names have been ingested for this payment ref
+        var projectNames = await db.TaskmanCosts
             .Where(t => t.PaymentRefId == paymentRefId)
-            .Select(t => new { t.TaskmanUserId, t.Developer })
+            .Select(t => t.TaskmanProject)
+            .Distinct()
             .ToListAsync(ct);
+
+        if (projectNames.Count == 0)
+            return Ok(new List<DiscoveredUser>()); // no ingestion yet for this ref
+
+        // Resolve to Taskman project IDs
+        var projectIds = await db.TaskmanProjects
+            .Where(p => projectNames.Contains(p.Name))
+            .Select(p => p.ProjectId)
+            .ToListAsync(ct);
+
+        // Scan each project live on Taskman
+        var allUsers = new Dictionary<int, string>(); // userId → name
+        foreach (var pid in projectIds)
+        {
+            try
+            {
+                var users = await redmine.DiscoverUsersAsync(pid, monthsBack, ct);
+                foreach (var u in users) allUsers.TryAdd(u.Id, u.Name);
+            }
+            catch { /* skip projects we can't access */ }
+        }
 
         var existingIds = (await db.Contractors
             .Where(c => c.TaskmanUserId != null)
             .Select(c => c.TaskmanUserId!.Value)
             .ToListAsync(ct)).ToHashSet();
 
-        // Group by developer name; a name is importable only if some row carries a user id
-        return Ok(devs
-            .GroupBy(d => d.Developer)
-            .Select(g =>
-            {
-                var uid = g.Select(x => x.TaskmanUserId).FirstOrDefault(x => x != null);
-                return new DiscoveredUser(uid, g.Key, uid != null && existingIds.Contains(uid.Value));
-            })
+        return Ok(allUsers
+            .Select(kv => new DiscoveredUser(kv.Key, kv.Value, existingIds.Contains(kv.Key)))
             .OrderBy(d => d.Name)
             .ToList());
     }

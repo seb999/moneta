@@ -49,6 +49,13 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             .Where(m => m.TaskmanCategory == "")
             .GroupBy(m => m.TaskmanProject)
             .ToDictionary(g => g.Key, g => g.First());
+        // Project-id default: a rule whose Category column holds the Taskman project id.
+        // Used as the category-less fallback (issue logged without a category), keyed by id
+        // so it is robust to project-name variants.
+        var mapProjectDefaultById = maps
+            .Where(m => int.TryParse(m.TaskmanCategory, out _))
+            .GroupBy(m => int.Parse(m.TaskmanCategory))
+            .ToDictionary(g => g.Key, g => g.First());
 
         // Which Redmine projects to pull
         List<int> projectIds;
@@ -164,7 +171,7 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                 string category = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var iss)
                     ? iss.Category?.Name ?? ""
                     : "";
-                var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Name, category, mapExact, mapProjectDefault);
+                var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Id, entry.Project.Name, category, mapExact, mapProjectDefault, mapProjectDefaultById);
 
                 var existing = await db.TaskmanCosts
                     .FirstOrDefaultAsync(t => t.ExternalRef == externalRef, ct);
@@ -219,18 +226,22 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
 
     /// <summary>
     /// Resolve (Project, Category) → (mpsCode, status) with fallback:
-    /// exact match → project default (blank category) → unmapped.
+    /// exact (project name, category) → project-id default → project-name default → unmapped.
+    /// The id/name defaults cover Taskman issues logged without a category.
     /// Returns status: mapped | assumed_default | excluded | unmapped.
     /// </summary>
     private static (string? Code, string Status) ResolveMps(
-        string project, string category,
+        int projectId, string project, string category,
         Dictionary<(string, string), Domain.CategoryMpsMap> exact,
-        Dictionary<string, Domain.CategoryMpsMap> projectDefault)
+        Dictionary<string, Domain.CategoryMpsMap> projectDefault,
+        Dictionary<int, Domain.CategoryMpsMap> projectDefaultById)
     {
         if (!string.IsNullOrEmpty(category) && exact.TryGetValue((project, category), out var m))
             return m.Excluded ? (null, "excluded") : (m.MpsCode, "mapped");
 
-        // Blank or unmapped category → project-level default
+        // Blank or unmapped category → project-level default, by project id first then name
+        if (projectDefaultById.TryGetValue(projectId, out var byId))
+            return byId.Excluded ? (null, "excluded") : (byId.MpsCode, "assumed_default");
         if (projectDefault.TryGetValue(project, out var def))
             return def.Excluded ? (null, "excluded") : (def.MpsCode, "assumed_default");
 

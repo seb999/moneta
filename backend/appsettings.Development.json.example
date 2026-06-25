@@ -10,9 +10,9 @@
     "ApiKey": "<your-redmine-api-key>"
   },
   "OpenAI": {
-    "ApiKey": "<your-openai-api-key>",
+    "ApiKey": "",
     "BaseUrl": "https://api.openai.com/v1",
-    "Model": "gpt-4o"
+    "Model": "gpt-5.2"
   },
   "TaskmanMcp": {
     "Url": "https://redmine-mcp.dspx.eu/mcp"

@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moneta.Api.Application;
@@ -11,15 +13,21 @@ public record InvoiceDto(
     int? PaymentRefId, string? PaymentRefCode, decimal ClaimedAmountEur,
     DateOnly ReceivedDate, string Status, string? VerifiedBy, DateTime? VerifiedAt, string? Note);
 
+/// <summary>A billed line as it appears on the invoice (one per developer), used at intake.</summary>
+public record InvoiceLineInput(string? Developer, decimal? Hours, decimal? AmountEur);
+
 public record CreateInvoiceRequest(
     string Consultant, string InvoiceRef, int FiscalYear, string Period,
-    int PaymentRefId, decimal ClaimedAmountEur, DateOnly? ReceivedDate, string? Note);
+    int PaymentRefId, decimal ClaimedAmountEur, DateOnly? ReceivedDate, string? Note,
+    List<InvoiceLineInput>? Lines = null);
 
-public record DeveloperLineDto(string Developer, decimal Hours, decimal ComputedEur);
+/// <summary>One row of the verification breakdown: exact Taskman cost vs the amount billed on the invoice.</summary>
+public record DeveloperLineDto(string Developer, decimal Hours, decimal TaskmanEur, decimal InvoiceEur, decimal DiffEur);
 
 public record VerificationDto(
     int InvoiceId, string? PaymentRefCode, string Period,
     decimal ClaimedEur, decimal ComputedEur, decimal VarianceEur,
+    decimal InvoiceLinesTotalEur, bool HasInvoiceLines,
     decimal TotalHours, List<DeveloperLineDto> Breakdown);
 
 public record VerifyRequest(string? VerifiedBy, string? Note);
@@ -28,7 +36,8 @@ public record VerifyRequest(string? VerifiedBy, string? Note);
 public record ExtractedInvoiceDto(
     string? Consultant, string? InvoiceRef, string? Period,
     decimal? ClaimedAmountEur, string? Currency, string? PaymentRefHint, string? Notes,
-    int? SuggestedPaymentRefId, string? SuggestedPaymentRefCode);
+    int? SuggestedPaymentRefId, string? SuggestedPaymentRefCode,
+    List<InvoiceLineInput> Lines);
 
 public record MpsSplitLineDto(string MpsCode, decimal Hours, decimal SharePct, decimal AmountEur);
 public record SplitDto(
@@ -78,17 +87,100 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
             // Normalise to alphanumerics so EEA.61006 matches EEA/DTL/25/015/EEA.61006 etc.
             static string Norm(string s) => new(s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
             var hint = Norm(ex.PaymentRefHint);
-            var hit = refs.FirstOrDefault(p =>
-            {
-                var code = Norm(p.PaymentRefId);
-                return code.Length > 0 && (hint.Contains(code) || code.Contains(hint));
-            });
-            if (hit is not null) { matchId = hit.Id; matchCode = hit.PaymentRefId; }
+            // Pick the ref with the longest overlap with the hint — so when several refs share a
+            // contract prefix (…/EEA/DTL/25/015/…), the distinctive suffix (e.g. 61006) decides.
+            var best = refs
+                .Select(p => new { p.Id, p.PaymentRefId, Overlap = LongestCommonSubstringLength(hint, Norm(p.PaymentRefId)) })
+                .Where(x => x.Overlap >= 5)
+                .OrderByDescending(x => x.Overlap)
+                .FirstOrDefault();
+            if (best is not null) { matchId = best.Id; matchCode = best.PaymentRefId; }
         }
+
+        var lines = (ex.Lines ?? [])
+            .Select(l => new InvoiceLineInput(l.Developer, l.Hours, l.AmountEur))
+            .ToList();
 
         return Ok(new ExtractedInvoiceDto(
             ex.Consultant, ex.InvoiceRef, ex.Period, ex.ClaimedAmountEur,
-            ex.Currency, ex.PaymentRefHint, ex.Notes, matchId, matchCode));
+            ex.Currency, ex.PaymentRefHint, ex.Notes, matchId, matchCode, lines));
+    }
+
+    /// <summary>Set of name-words, lower-cased and accent-folded (é→e), split on spaces/punctuation.</summary>
+    static HashSet<string> NameTokens(string name) =>
+        name.Split([' ', '.', ',', '-', '_', '/', '\t'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(Fold)
+            .Where(w => w.Length > 0)
+            .ToHashSet();
+
+    /// <summary>Lower-case, strip diacritics (Bécares → becares), keep letters/digits only.</summary>
+    static string Fold(string w)
+    {
+        var decomposed = w.ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(decomposed.Length);
+        foreach (var c in decomposed)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark && char.IsLetterOrDigit(c))
+                sb.Append(c);
+        return sb.ToString();
+    }
+
+    /// <summary>Count of name-words shared between two token sets, tolerating spelling variants
+    /// (Oscar/Oskar) via a small edit-distance threshold. Greedy 1:1 pairing.</summary>
+    static int FuzzyShared(HashSet<string> a, HashSet<string> b)
+    {
+        var remaining = b.ToList();
+        int score = 0;
+        foreach (var ta in a)
+        {
+            int idx = remaining.FindIndex(tb => SimilarToken(ta, tb));
+            if (idx >= 0) { score++; remaining.RemoveAt(idx); }
+        }
+        return score;
+    }
+
+    /// <summary>Two name-words are "the same" if equal or within a length-scaled edit distance.</summary>
+    static bool SimilarToken(string a, string b)
+    {
+        if (a == b) return true;
+        int max = Math.Max(a.Length, b.Length);
+        if (max < 3) return false;                       // too short to fuzzy-match safely
+        int allowed = max <= 6 ? 1 : 2;                  // Oscar/Oskar = 1; longer names tolerate 2
+        return Levenshtein(a, b) <= allowed;
+    }
+
+    static int Levenshtein(string a, string b)
+    {
+        var d = new int[b.Length + 1];
+        for (int j = 0; j <= b.Length; j++) d[j] = j;
+        for (int i = 1; i <= a.Length; i++)
+        {
+            int prev = d[0]; d[0] = i;
+            for (int j = 1; j <= b.Length; j++)
+            {
+                int tmp = d[j];
+                d[j] = Math.Min(Math.Min(d[j] + 1, d[j - 1] + 1), prev + (a[i - 1] == b[j - 1] ? 0 : 1));
+                prev = tmp;
+            }
+        }
+        return d[b.Length];
+    }
+
+    /// <summary>Length of the longest common contiguous substring of a and b.</summary>
+    static int LongestCommonSubstringLength(string a, string b)
+    {
+        if (a.Length == 0 || b.Length == 0) return 0;
+        var prev = new int[b.Length + 1];
+        int best = 0;
+        for (int i = 1; i <= a.Length; i++)
+        {
+            var cur = new int[b.Length + 1];
+            for (int j = 1; j <= b.Length; j++)
+            {
+                if (a[i - 1] == b[j - 1]) { cur[j] = prev[j - 1] + 1; if (cur[j] > best) best = cur[j]; }
+            }
+            prev = cur;
+        }
+        return best;
     }
 
     static InvoiceDto ToDto(Invoice i) => new(
@@ -132,6 +224,21 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
         };
         db.Invoices.Add(entity);
         await db.SaveChangesAsync();
+
+        // Persist the invoice's billed lines (from extraction or manual entry), if any
+        foreach (var l in req.Lines ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(l.Developer) && l.AmountEur is null) continue;
+            db.InvoiceClaimLines.Add(new InvoiceClaimLine
+            {
+                InvoiceId   = entity.Id,
+                Developer   = (l.Developer ?? "").Trim(),
+                Hours       = l.Hours,
+                AmountCents = (long)Math.Round((l.AmountEur ?? 0) * 100, MidpointRounding.AwayFromZero),
+            });
+        }
+        await db.SaveChangesAsync();
+
         entity.PaymentRef = pref;
         return Ok(ToDto(entity));
     }
@@ -141,8 +248,9 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
     {
         var entity = await db.Invoices.FindAsync(id);
         if (entity is null) return NotFound();
-        // Remove any booked split lines + the booked actual
+        // Remove any booked split lines, billed lines + the booked actual
         await db.InvoiceLines.Where(l => l.InvoiceId == id).ExecuteDeleteAsync(ct);
+        await db.InvoiceClaimLines.Where(l => l.InvoiceId == id).ExecuteDeleteAsync(ct);
         await db.Actuals.Where(a => a.InvoiceId == id).ExecuteDeleteAsync(ct);
         db.Invoices.Remove(entity);
         await db.SaveChangesAsync(ct);
@@ -162,18 +270,57 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
             .Select(t => new { t.Developer, t.Hours, t.ComputedAmountCents })
             .ToListAsync(ct);
 
-        var breakdown = rows
-            .GroupBy(r => r.Developer)
-            .Select(g => new DeveloperLineDto(g.Key, g.Sum(x => x.Hours), g.Sum(x => x.ComputedAmountCents) / 100m))
-            .OrderByDescending(d => d.ComputedEur)
-            .ToList();
+        var invoiceLines = await db.InvoiceClaimLines
+            .Where(l => l.InvoiceId == id)
+            .Select(l => new { l.Developer, l.AmountCents })
+            .ToListAsync(ct);
 
-        decimal claimed = inv.ClaimedAmountCents / 100m;
-        decimal computed = rows.Sum(r => r.ComputedAmountCents) / 100m;
+        // Merge Taskman (exact cost) and invoice (billed) per developer. Names are matched on
+        // name-tokens, not exact strings, so "Natalia Orio Moreno" (Taskman) lines up with
+        // "Natalia Orio" (invoice) — a dropped middle name / surname still matches.
+        var taskman = rows
+            .GroupBy(r => r.Developer)
+            .Select(g => new { Developer = g.Key, Hours = g.Sum(x => x.Hours), Cents = g.Sum(x => x.ComputedAmountCents) })
+            .ToList();
+        var invItems = invoiceLines
+            .GroupBy(l => l.Developer)
+            .Select(g => new { Label = g.Key, Cents = g.Sum(x => x.AmountCents), Tokens = NameTokens(g.Key), Used = new bool[1] })
+            .ToList(); // Used is a 1-element array so it can be flipped in place during matching
+
+        var breakdown = new List<DeveloperLineDto>();
+        foreach (var t in taskman)
+        {
+            var tTokens = NameTokens(t.Developer);
+            // Best available invoice line by shared name-words (≥2 shared, or a single-word name
+            // that matches). Tolerates accents and spelling variants (Bécares/Becares, Oscar/Oskar).
+            var match = invItems
+                .Where(x => !x.Used[0])
+                .Select(x => new { Item = x, Score = FuzzyShared(x.Tokens, tTokens) })
+                .Where(x => x.Score >= 2 || (x.Score >= 1 && Math.Min(x.Item.Tokens.Count, tTokens.Count) == 1))
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            long invCents = 0;
+            if (match is not null) { invCents = match.Item.Cents; match.Item.Used[0] = true; }
+            decimal taskmanEur = t.Cents / 100m, invoiceEur = invCents / 100m;
+            breakdown.Add(new DeveloperLineDto(t.Developer, t.Hours, taskmanEur, invoiceEur, invoiceEur - taskmanEur));
+        }
+        // Invoice lines with no matching Taskman developer (over-billed / unknown name)
+        foreach (var x in invItems.Where(x => !x.Used[0]))
+        {
+            decimal invoiceEur = x.Cents / 100m;
+            breakdown.Add(new DeveloperLineDto(x.Label, 0, 0, invoiceEur, invoiceEur));
+        }
+        breakdown = breakdown.OrderByDescending(b => b.TaskmanEur).ToList();
+
+        decimal claimed       = inv.ClaimedAmountCents / 100m;
+        decimal computed      = rows.Sum(r => r.ComputedAmountCents) / 100m;
+        decimal invoiceTotal  = invoiceLines.Sum(l => l.AmountCents) / 100m;
 
         return Ok(new VerificationDto(
             inv.Id, inv.PaymentRef?.PaymentRefId, inv.Period,
             claimed, computed, claimed - computed,
+            invoiceTotal, invoiceLines.Count > 0,
             breakdown.Sum(b => b.Hours), breakdown));
     }
 

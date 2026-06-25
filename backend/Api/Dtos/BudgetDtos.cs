@@ -10,6 +10,7 @@ public record CreateFiscalYearRequest(int Year, string Status = "open");
 public record PaymentRefDto(int Id, int FiscalYear, string PaymentRefId, string Description);
 
 public record CreatePaymentRefRequest(int FiscalYear, string PaymentRefId, string Description);
+public record SyncPaymentRefsResult(int FoundInTaskman, int Created, List<string> CreatedRefs);
 
 /// <summary>
 /// One row in the budget summary: budget → committed → spent → remaining.
@@ -62,7 +63,8 @@ public record CommitmentDto(
     decimal AmountEur,
     DateOnly Date,
     string? Counterparty,
-    string Status);
+    string Status,
+    string ContractType);
 
 public record CreateCommitmentRequest(
     int PaymentRefId,
@@ -71,7 +73,8 @@ public record CreateCommitmentRequest(
     decimal AmountEur,
     DateOnly Date,
     string? Counterparty,
-    string Status = "active");
+    string Status = "active",
+    string ContractType = "TM");
 
 public record UpdateCommitmentStatusRequest(string Status);
 

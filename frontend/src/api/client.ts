@@ -1,4 +1,4 @@
-import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
+import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, InvoiceLineInput, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
 import { getTaskmanKey } from './taskmanKey'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -35,6 +35,9 @@ export const updatePaymentRef = (id: number, data: Omit<PaymentRef, 'id'>) =>
   request<void>(`/payment-refs/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const deletePaymentRef = (id: number) =>
   request<void>(`/payment-refs/${id}`, { method: 'DELETE' })
+export const syncPaymentRefsFromTaskman = (year: number, projectId: number) =>
+  request<{ foundInTaskman: number; created: number; createdRefs: string[] }>(
+    `/payment-refs/sync-from-taskman?year=${year}&projectId=${projectId}`, { method: 'POST' })
 
 // Appropriations
 export const getAppropriations = (year?: number, paymentRefId?: number) => {
@@ -43,15 +46,20 @@ export const getAppropriations = (year?: number, paymentRefId?: number) => {
   if (paymentRefId) params.set('paymentRefId', String(paymentRefId))
   return request<Appropriation[]>(`/appropriations?${params}`)
 }
-export const createAppropriation = (data: {
+export type AppropriationInput = {
   paymentRefId: number
   fiscalYear: number
   caAmountEur: number
   paAmountEur: number
   creditOrigin?: string
+  source?: string
   effectiveDate?: string
   note?: string
-}) => request<Appropriation>('/appropriations', { method: 'POST', body: JSON.stringify(data) })
+}
+export const createAppropriation = (data: AppropriationInput) =>
+  request<Appropriation>('/appropriations', { method: 'POST', body: JSON.stringify(data) })
+export const updateAppropriation = (id: number, data: AppropriationInput) =>
+  request<Appropriation>(`/appropriations/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const deleteAppropriation = (id: number) =>
   request<void>(`/appropriations/${id}`, { method: 'DELETE' })
 
@@ -62,7 +70,7 @@ export const getCommitments = (year?: number, paymentRefId?: number) => {
   if (paymentRefId) params.set('paymentRefId', String(paymentRefId))
   return request<Commitment[]>(`/commitments?${params}`)
 }
-export const createCommitment = (data: {
+export type CommitmentInput = {
   paymentRefId: number
   fiscalYear: number
   reference: string
@@ -70,7 +78,12 @@ export const createCommitment = (data: {
   date: string
   counterparty?: string
   status?: string
-}) => request<Commitment>('/commitments', { method: 'POST', body: JSON.stringify(data) })
+  contractType?: string
+}
+export const createCommitment = (data: CommitmentInput) =>
+  request<Commitment>('/commitments', { method: 'POST', body: JSON.stringify(data) })
+export const updateCommitment = (id: number, data: CommitmentInput) =>
+  request<Commitment>(`/commitments/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const updateCommitmentStatus = (id: number, status: string) =>
   request<void>(`/commitments/${id}/status`, { method: 'PATCH', body: JSON.stringify(status) })
 
@@ -178,6 +191,7 @@ export const getInvoices = (year?: number, status?: string) => {
 export const createInvoice = (data: {
   consultant: string; invoiceRef: string; fiscalYear: number; period: string
   paymentRefId: number; claimedAmountEur: number; receivedDate?: string; note?: string
+  lines?: InvoiceLineInput[]
 }) => request<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) })
 export const deleteInvoice = (id: number) => request<void>(`/invoices/${id}`, { method: 'DELETE' })
 export const getVerification = (id: number) => request<Verification>(`/invoices/${id}/verification`)

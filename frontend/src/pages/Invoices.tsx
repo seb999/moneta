@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getInvoices, createInvoice, deleteInvoice, getPaymentRefs, getVerification, getSplit, getInvoiceLines, verifyInvoice, disputeInvoice, extractInvoice } from '../api/client'
 import { eur } from '../api/format'
 import { useYear } from '../contexts/YearContext'
-import type { Invoice, PaymentRef, Verification, Split, MpsSplitLine } from '../api/types'
+import type { Invoice, PaymentRef, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
 
 function exportSplitCsv(invoice: Invoice, lines: MpsSplitLine[]) {
   const header = 'MPS Code,Hours,Share %,Amount EUR\n'
@@ -92,23 +92,54 @@ function VerificationPanel({ invoice, onClose, onChanged }: { invoice: Invoice; 
 
             {/* Developer breakdown */}
             <div className="card" style={{ marginBottom: 16 }}>
-              <div className="card-header"><h2>Computed breakdown</h2></div>
+              <div className="card-header"><h2>Breakdown — Taskman vs Invoice</h2></div>
               <div className="table-wrap" style={{ maxHeight: 220, overflowY: 'auto' }}>
                 <table>
-                  <thead><tr><th>Developer</th><th className="num">Hours</th><th className="num">Computed (€)</th></tr></thead>
+                  <thead><tr>
+                    <th>Developer</th>
+                    <th className="num">Hours</th>
+                    <th className="num" title="Exact: hours ÷ 8 × daily rate (no rounding)">Taskman (€)</th>
+                    <th className="num" title="As billed on the invoice (LLM-extracted line)">Invoice (€)</th>
+                    <th className="num">Diff (€)</th>
+                  </tr></thead>
                   <tbody>
                     {v.breakdown.length === 0 ? (
-                      <tr><td colSpan={3} className="empty-state">No Taskman cost for this ref/period. Ingest it first.</td></tr>
+                      <tr><td colSpan={5} className="empty-state">No Taskman cost for this ref/period. Ingest it first.</td></tr>
                     ) : v.breakdown.map((b, i) => (
                       <tr key={i}>
                         <td className="text-sm">{b.developer}</td>
                         <td className="num text-sm">{b.hours.toFixed(2)}</td>
-                        <td className="num"><span className="eur">{eur(b.computedEur)}</span></td>
+                        <td className="num"><span className="eur">{eur(b.taskmanEur)}</span></td>
+                        <td className="num">{v.hasInvoiceLines ? <span className="eur">{eur(b.invoiceEur)}</span> : <span className="text-muted">—</span>}</td>
+                        <td className="num text-sm" style={{ color: !v.hasInvoiceLines ? 'inherit' : b.diffEur > 0 ? 'var(--clr-danger)' : b.diffEur < 0 ? 'var(--clr-green)' : 'inherit' }}>
+                          {v.hasInvoiceLines ? `${b.diffEur > 0 ? '+' : ''}${eur(b.diffEur)}` : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
+                  {v.breakdown.length > 0 && (
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid var(--clr-border)', fontWeight: 700, background: 'var(--clr-bg)' }}>
+                        <td className="text-sm">TOTAL</td>
+                        <td className="num text-sm">{v.totalHours.toFixed(2)}</td>
+                        <td className="num"><span className="eur">{eur(v.computedEur)}</span></td>
+                        <td className="num">{v.hasInvoiceLines ? <span className="eur">{eur(v.invoiceLinesTotalEur)}</span> : <span className="text-muted">—</span>}</td>
+                        <td className="num text-sm" style={{ color: v.hasInvoiceLines && v.invoiceLinesTotalEur - v.computedEur > 0 ? 'var(--clr-danger)' : 'inherit' }}>
+                          {v.hasInvoiceLines ? `${v.invoiceLinesTotalEur - v.computedEur > 0 ? '+' : ''}${eur(v.invoiceLinesTotalEur - v.computedEur)}` : '—'}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
+              {!v.hasInvoiceLines && (
+                <div className="card-body" style={{ paddingTop: 10 }}>
+                  <p className="text-sm text-muted">
+                    No per-line invoice detail captured — the Invoice column is blank. Upload the invoice PDF at intake
+                    so the extractor can read its line items, or compare against the Claimed total above.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* MPS split */}
@@ -200,6 +231,7 @@ export default function Invoices() {
   const [receivedDate, setReceivedDate] = useState('')
   const [extracting, setExtracting] = useState(false)
   const [extractMsg, setExtractMsg] = useState<string | null>(null)
+  const [extractedLines, setExtractedLines] = useState<InvoiceLineInput[]>([])
 
   function load() {
     setLoading(true)
@@ -212,7 +244,7 @@ export default function Invoices() {
   useEffect(() => { load() }, [year])
 
   function openForm() {
-    setError(null); setExtractMsg(null)
+    setError(null); setExtractMsg(null); setExtractedLines([])
     setConsultant(''); setInvoiceRef(''); setPeriod(''); setAmount('')
     setReceivedDate(new Date().toISOString().slice(0, 10))
     if (refs.length > 0) setPaymentRefId(String(refs[0].id))
@@ -231,10 +263,12 @@ export default function Invoices() {
       if (x.period) setPeriod(x.period)
       if (x.claimedAmountEur != null) setAmount(String(x.claimedAmountEur))
       if (x.suggestedPaymentRefId != null) setPaymentRefId(String(x.suggestedPaymentRefId))
+      setExtractedLines(x.lines ?? [])
       const bits = [
         x.suggestedPaymentRefCode
           ? `matched payment ref ${x.suggestedPaymentRefCode}`
           : x.paymentRefHint ? `no payment-ref match for "${x.paymentRefHint}"` : null,
+        x.lines?.length ? `${x.lines.length} invoice line(s) captured` : 'no invoice line detail found',
         x.notes,
       ].filter(Boolean)
       setExtractMsg(`Pre-filled from PDF. Review every field before saving${bits.length ? ' — ' + bits.join('; ') : '.'}`)
@@ -251,6 +285,7 @@ export default function Invoices() {
       await createInvoice({
         consultant, invoiceRef, fiscalYear: year, period,
         paymentRefId: Number(paymentRefId), claimedAmountEur: Number(amount), receivedDate,
+        lines: extractedLines.length ? extractedLines : undefined,
       })
       setShowForm(false); load()
     } catch (e) { setError(String(e)) }
@@ -266,10 +301,9 @@ export default function Invoices() {
     <>
       <div className="page-header">
         <h1>Invoices — {year}</h1>
-        <button onClick={openForm} disabled={refs.length === 0}>+ Add Invoice</button>
+        <button onClick={openForm}>+ Add Invoice</button>
       </div>
       <div className="page-content">
-        {refs.length === 0 && !loading && <p className="text-muted" style={{ marginBottom: 12 }}>No payment refs for {year} yet.</p>}
         {error && !showForm && <p style={{ color: 'var(--clr-danger)', marginBottom: 12 }}>{error}</p>}
         <div className="card">
           <div className="table-wrap">
@@ -326,6 +360,11 @@ export default function Invoices() {
               {extracting && <p className="text-muted text-sm" style={{ marginTop: 6 }}>Reading PDF…</p>}
               {extractMsg && <p className="text-sm" style={{ marginTop: 6, color: 'var(--clr-green)' }}>{extractMsg}</p>}
             </div>
+            {refs.length === 0 && (
+              <p style={{ color: 'var(--clr-danger)', marginBottom: 12, fontSize: 13 }}>
+                No payment refs for {year} yet — add one on the MPS Codes page before creating an invoice.
+              </p>
+            )}
             {error && <p style={{ color: 'var(--clr-danger)', marginBottom: 12, fontSize: 13 }}>{error}</p>}
             <form onSubmit={handleCreate}>
               <div className="form-row cols-2">

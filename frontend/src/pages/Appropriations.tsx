@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getAppropriations, getPaymentRefs, createAppropriation, deleteAppropriation } from '../api/client'
+import { getAppropriations, getPaymentRefs, createAppropriation, updateAppropriation, deleteAppropriation } from '../api/client'
 import { eur } from '../api/format'
 import { useYear } from '../contexts/YearContext'
 import type { Appropriation, PaymentRef } from '../api/types'
@@ -10,6 +10,7 @@ export default function Appropriations() {
   const [refs, setRefs] = useState<PaymentRef[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -36,25 +37,36 @@ export default function Appropriations() {
   useEffect(() => { load() }, [year])
 
   function openForm() {
-    setError(null)
+    setError(null); setEditingId(null)
     setCaAmount(''); setPaAmount(''); setCreditOrigin('C1'); setSource('initial')
     setEffectiveDate(String(year) + '-01-01'); setNote('')
     if (refs.length > 0) setPaymentRefId(String(refs[0].id))
     setShowForm(true)
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  function openEdit(a: Appropriation) {
+    setError(null); setEditingId(a.id)
+    setPaymentRefId(String(a.paymentRefId))
+    setCaAmount(String(a.caAmountEur)); setPaAmount(String(a.paAmountEur))
+    setCreditOrigin(a.creditOrigin); setSource(a.source)
+    setEffectiveDate(a.effectiveDate); setNote(a.note ?? '')
+    setShowForm(true)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setError(null)
     try {
-      await createAppropriation({
+      const data = {
         paymentRefId: Number(paymentRefId),
         fiscalYear: year,
         caAmountEur: Number(caAmount),
         paAmountEur: Number(paAmount),
-        creditOrigin, effectiveDate,
+        creditOrigin, source, effectiveDate,
         note: note || undefined,
-      })
+      }
+      if (editingId != null) await updateAppropriation(editingId, data)
+      else await createAppropriation(data)
       setShowForm(false); load()
     } catch (e) { setError(String(e)) }
     finally { setSaving(false) }
@@ -106,7 +118,8 @@ export default function Appropriations() {
                     <td className="num"><span className="eur">{eur(a.paAmountEur)}</span></td>
                     <td className="text-sm text-muted">{a.effectiveDate}</td>
                     <td className="text-sm text-muted">{a.note ?? '—'}</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => openEdit(a)}>Edit</button>
                       <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(a.id)}>Delete</button>
                     </td>
                   </tr>
@@ -120,9 +133,9 @@ export default function Appropriations() {
       {showForm && (
         <div className="modal-overlay" onClick={() => setShowForm(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>Add Appropriation — {year}</h3>
+            <h3>{editingId != null ? 'Edit' : 'Add'} Appropriation — {year}</h3>
             {error && <p style={{ color: 'var(--clr-danger)', marginBottom: 12, fontSize: 13 }}>{error}</p>}
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSubmit}>
               <div className="form-row">
                 <div>
                   <label>Payment Ref</label>
@@ -172,7 +185,7 @@ export default function Appropriations() {
               </div>
               <div className="form-actions">
                 <button type="button" className="secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Create'}</button>
+                <button type="submit" disabled={saving}>{saving ? 'Saving…' : editingId != null ? 'Save' : 'Create'}</button>
               </div>
             </form>
           </div>

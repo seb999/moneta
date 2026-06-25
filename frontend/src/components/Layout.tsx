@@ -33,14 +33,18 @@ export default function Layout() {
           <NavLink to="/actuals" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Actuals
           </NavLink>
-          <NavLink to="/invoices" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-            Invoices
-          </NavLink>
+
+          <hr style={{ border: 0, borderTop: '1px solid var(--clr-border)', margin: '10px 16px' }} />
+
+          
           <NavLink to="/ingestion" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Taskman Ingestion
           </NavLink>
           <NavLink to="/work-effort" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Work Effort
+          </NavLink>
+          <NavLink to="/invoices" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+            Invoices
           </NavLink>
 
           <hr style={{ border: 0, borderTop: '1px solid var(--clr-border)', margin: '10px 16px' }} />

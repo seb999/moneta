@@ -12,6 +12,7 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
     public DbSet<Actual> Actuals => Set<Actual>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+    public DbSet<InvoiceClaimLine> InvoiceClaimLines => Set<InvoiceClaimLine>();
     public DbSet<TaskmanCost> TaskmanCosts => Set<TaskmanCost>();
     public DbSet<TaskmanProject> TaskmanProjects => Set<TaskmanProject>();
     public DbSet<Contractor> Contractors => Set<Contractor>();

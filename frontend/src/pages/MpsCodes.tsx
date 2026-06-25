@@ -55,7 +55,6 @@ export default function MpsCodes() {
   }
 
   async function handleDeleteMapping(id: number) {
-    if (!confirm('Delete this mapping rule?')) return
     try { await deleteMpsMapping(id); load() }
     catch (e) { setError(String(e)) }
   }

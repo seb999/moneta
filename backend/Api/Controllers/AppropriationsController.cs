@@ -51,6 +51,31 @@ public class AppropriationsController(MonetaDbContext db) : ControllerBase
             entity.CreditOrigin, entity.Source, entity.EffectiveDate, entity.Note));
     }
 
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<AppropriationDto>> Update(int id, CreateAppropriationRequest req)
+    {
+        var entity = await db.Appropriations.Include(a => a.PaymentRef).FirstOrDefaultAsync(a => a.Id == id);
+        if (entity is null) return NotFound();
+
+        var paymentRef = await db.PaymentRefs.FindAsync(req.PaymentRefId);
+        if (paymentRef is null) return BadRequest($"Payment ref {req.PaymentRefId} not found.");
+
+        entity.PaymentRefId  = req.PaymentRefId;
+        entity.FiscalYear    = req.FiscalYear;
+        entity.CaAmountCents = (long)(req.CaAmountEur * 100);
+        entity.PaAmountCents = (long)(req.PaAmountEur * 100);
+        entity.CreditOrigin  = req.CreditOrigin;
+        entity.Source        = req.Source;
+        entity.EffectiveDate = req.EffectiveDate ?? entity.EffectiveDate;
+        entity.Note          = req.Note;
+        await db.SaveChangesAsync();
+
+        return Ok(new AppropriationDto(
+            entity.Id, entity.PaymentRefId, paymentRef.PaymentRefId, entity.FiscalYear,
+            entity.CaAmountCents / 100m, entity.PaAmountCents / 100m,
+            entity.CreditOrigin, entity.Source, entity.EffectiveDate, entity.Note));
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
