@@ -32,17 +32,24 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
-
-app.UseCors();
-app.UseHttpsRedirection();
-app.MapControllers();
-
-// Auto-apply migrations on startup in development
+// Dev-only: OpenAPI, cross-origin Vite dev server (5173), and HTTPS redirect.
+// In the container the SPA is served same-origin over plain HTTP behind a proxy.
 if (app.Environment.IsDevelopment())
 {
-    using var scope = app.Services.CreateScope();
+    app.MapOpenApi();
+    app.UseCors();
+    app.UseHttpsRedirection();
+}
+
+// Serve the built React SPA (copied to wwwroot in the Docker image) and the API
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapControllers();
+app.MapFallbackToFile("index.html"); // client-side routing
+
+// Apply EF migrations + ensure the SQLite data dir exists, on every startup
+using (var scope = app.Services.CreateScope())
+{
     var db = scope.ServiceProvider.GetRequiredService<MonetaDbContext>();
     Directory.CreateDirectory("data");
     db.Database.Migrate();

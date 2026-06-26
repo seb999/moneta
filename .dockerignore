@@ -1,0 +1,29 @@
+# Build outputs
+**/bin
+**/obj
+**/dist
+**/node_modules
+
+# Local data / DB
+backend/data
+**/*.db
+**/*.db-*
+
+# Local config & secrets (real values come from env at runtime)
+backend/appsettings.Development.json
+**/.env
+**/.env.*
+
+# Tooling / VCS
+.git
+.gitignore
+.vs
+.vscode
+.idea
+**/*.user
+
+# Reference repos (not part of the build)
+OldApp
+discodata-ng
+dev-plan
+Taskman

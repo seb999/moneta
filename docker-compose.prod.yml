@@ -1,0 +1,24 @@
+# Production compose for the deploy host: runs the published image (no local build).
+# Put this file + a .env (real secrets) in DEPLOY_PATH on the server.
+services:
+  moneta:
+    image: ghcr.io/seb999/moneta:latest
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Data Source=data/moneta.db"
+      Taskman__BaseUrl: "${TASKMAN_BASE_URL:-https://taskman.eionet.europa.eu}"
+      Taskman__ApiKey: "${TASKMAN_API_KEY:-}"
+      OpenAI__ApiKey: "${OPENAI_API_KEY:-}"
+      OpenAI__BaseUrl: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+      OpenAI__Model: "${OPENAI_MODEL:-gpt-5.2}"
+      OpenAI__ExtractionModel: "${OPENAI_EXTRACTION_MODEL:-gpt-4o}"
+      TaskmanMcp__Url: "${TASKMAN_MCP_URL:-}"
+      TaskmanMcp__ApiKey: "${TASKMAN_MCP_API_KEY:-}"
+    volumes:
+      - moneta-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  moneta-data:

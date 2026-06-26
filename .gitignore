@@ -36,3 +36,6 @@ Thumbs.db
 .idea/
 OldApp/
 discodata-ng/
+
+# Local env / secrets
+.env
