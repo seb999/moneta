@@ -34,3 +34,5 @@ test.txt
 Thumbs.db
 *.swp
 .idea/
+OldApp/
+discodata-ng/
