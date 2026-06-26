@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moneta.Api.Application;
@@ -257,6 +258,52 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
         return NoContent();
     }
 
+    public record ReadinessProjectDto(int ProjectId, string Name, bool Ingested, int Rows);
+    public record ReadinessDto(int PaymentRefId, string Period, bool DerivedFromHistory, int TotalCostRows, List<ReadinessProjectDto> Projects);
+
+    /// <summary>
+    /// Whether Taskman cost data is present to verify an invoice for (payment ref, period).
+    /// Lists the projects historically linked to the ref and each project's ingestion status
+    /// for the period, so the wizard can offer to ingest the missing ones.
+    /// </summary>
+    [HttpGet("readiness")]
+    public async Task<ActionResult<ReadinessDto>> Readiness(
+        [FromQuery] int paymentRefId, [FromQuery] string period, CancellationToken ct)
+    {
+        // Projects historically linked to this ref (from prior ingestion)
+        var projectNames = await db.TaskmanCosts
+            .Where(t => t.PaymentRefId == paymentRefId)
+            .Select(t => t.TaskmanProject)
+            .Distinct()
+            .ToListAsync(ct);
+
+        var projects = await db.TaskmanProjects
+            .Where(p => projectNames.Contains(p.Name))
+            .Select(p => new { p.ProjectId, p.Name })
+            .ToListAsync(ct);
+
+        // Per-project row counts for the period (any ref — ingestion is by project+period)
+        var periodRows = (await db.TaskmanCosts
+            .Where(t => t.Period == period && projectNames.Contains(t.TaskmanProject))
+            .Select(t => t.TaskmanProject)
+            .ToListAsync(ct))
+            .GroupBy(n => n)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var projectStatus = projects
+            .Select(p =>
+            {
+                int rows = periodRows.GetValueOrDefault(p.Name, 0);
+                return new ReadinessProjectDto(p.ProjectId, p.Name, rows > 0, rows);
+            })
+            .OrderBy(p => p.Name)
+            .ToList();
+
+        int total = await db.TaskmanCosts.CountAsync(t => t.PaymentRefId == paymentRefId && t.Period == period, ct);
+
+        return Ok(new ReadinessDto(paymentRefId, period, projectNames.Count > 0, total, projectStatus));
+    }
+
     /// <summary>Claimed amount vs Taskman computed cost for the invoice's (payment ref, period).</summary>
     [HttpGet("{id:int}/verification")]
     public async Task<ActionResult<VerificationDto>> Verification(int id, CancellationToken ct)
@@ -344,6 +391,108 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
             .Select(l => new MpsSplitLineDto(
                 l.MpsCode ?? "—", l.Hours,
                 total > 0 ? l.Hours / total * 100 : 0, l.AmountCents / 100m));
+    }
+
+    /// <summary>Excel breakdown of a verified invoice: timelog + pivot-by-MPS + per-MPS split.</summary>
+    [HttpGet("{id:int}/export")]
+    public async Task<IActionResult> Export(int id, CancellationToken ct)
+    {
+        var inv = await db.Invoices.Include(i => i.PaymentRef).FirstOrDefaultAsync(i => i.Id == id, ct);
+        if (inv is null) return NotFound();
+        if (inv.Status != "verified") return BadRequest("Only verified invoices can be exported.");
+
+        var costs = await db.TaskmanCosts
+            .Where(t => t.PaymentRefId == inv.PaymentRefId && t.Period == inv.Period)
+            .ToListAsync(ct);
+        var splitLines = await db.InvoiceLines.Where(l => l.InvoiceId == id).ToListAsync(ct);
+
+        using var wb = new XLWorkbook();
+
+        // ── Sheet 1: Timelog ──────────────────────────────────────────────────
+        var ws = wb.AddWorksheet("Timelog");
+        string[] headers = ["Date", "User", "Project", "Category", "Activity", "Payment Class", "Issue", "Comment", "Hours", "MPS"];
+        for (int c = 0; c < headers.Length; c++) ws.Cell(1, c + 1).Value = headers[c];
+        ws.Row(1).Style.Font.Bold = true;
+        int r = 2;
+        foreach (var t in costs.OrderBy(t => t.EntryDate).ThenBy(t => t.Developer))
+        {
+            if (t.EntryDate is DateOnly dd) { ws.Cell(r, 1).Value = dd.ToDateTime(TimeOnly.MinValue); ws.Cell(r, 1).Style.DateFormat.Format = "yyyy-mm-dd"; }
+            ws.Cell(r, 2).Value = t.Developer;
+            ws.Cell(r, 3).Value = t.TaskmanProject;
+            ws.Cell(r, 4).Value = t.TaskmanCategory;
+            ws.Cell(r, 5).Value = t.Activity ?? "";
+            ws.Cell(r, 6).Value = t.PaymentClass ?? "";
+            ws.Cell(r, 7).Value = t.IssueId is int iid ? $"#{iid}: {t.IssueSubject}" : (t.IssueSubject ?? "");
+            ws.Cell(r, 8).Value = t.Comment ?? "";
+            ws.Cell(r, 9).Value = (double)t.Hours;
+            ws.Cell(r, 10).Value = t.MpsCode ?? "";
+            r++;
+        }
+        ws.Columns().AdjustToContents();
+
+        decimal totalHours = costs.Sum(t => t.Hours);
+
+        // ── Sheet 2: Pivot (hours by MPS, and by Project/Category) ─────────────
+        var wp = wb.AddWorksheet("Pivot");
+        wp.Cell(1, 1).Value = "Hours by MPS"; wp.Cell(1, 1).Style.Font.Bold = true;
+        wp.Cell(2, 1).Value = "MPS"; wp.Cell(2, 2).Value = "Hours"; wp.Cell(2, 3).Value = "Share %";
+        wp.Range(2, 1, 2, 3).Style.Font.Bold = true;
+        int pr = 3;
+        foreach (var g in costs.GroupBy(t => t.MpsCode ?? "(unmapped)").OrderByDescending(g => g.Sum(x => x.Hours)))
+        {
+            decimal h = g.Sum(x => x.Hours);
+            wp.Cell(pr, 1).Value = g.Key;
+            wp.Cell(pr, 2).Value = (double)h;
+            wp.Cell(pr, 3).Value = totalHours > 0 ? (double)(h / totalHours) : 0; wp.Cell(pr, 3).Style.NumberFormat.Format = "0.0%";
+            pr++;
+        }
+        wp.Cell(pr, 1).Value = "Grand Total"; wp.Cell(pr, 2).Value = (double)totalHours;
+        wp.Range(pr, 1, pr, 3).Style.Font.Bold = true;
+
+        pr += 2;
+        wp.Cell(pr, 1).Value = "Hours by Project / Category"; wp.Cell(pr, 1).Style.Font.Bold = true; pr++;
+        wp.Cell(pr, 1).Value = "Project"; wp.Cell(pr, 2).Value = "Category"; wp.Cell(pr, 3).Value = "Hours";
+        wp.Range(pr, 1, pr, 3).Style.Font.Bold = true; pr++;
+        foreach (var g in costs.GroupBy(t => new { t.TaskmanProject, t.TaskmanCategory }).OrderBy(g => g.Key.TaskmanProject).ThenBy(g => g.Key.TaskmanCategory))
+        {
+            wp.Cell(pr, 1).Value = g.Key.TaskmanProject;
+            wp.Cell(pr, 2).Value = g.Key.TaskmanCategory;
+            wp.Cell(pr, 3).Value = (double)g.Sum(x => x.Hours);
+            pr++;
+        }
+        wp.Columns().AdjustToContents();
+
+        // ── Sheet 3: Breakdown (per MPS: hours, %, amount €) ───────────────────
+        var wbk = wb.AddWorksheet("Breakdown");
+        wbk.Cell(1, 1).Value = $"Invoice {inv.InvoiceRef} — {inv.Consultant} — {inv.Period}"; wbk.Cell(1, 1).Style.Font.Bold = true;
+        wbk.Cell(3, 1).Value = "MPS"; wbk.Cell(3, 2).Value = "Hours"; wbk.Cell(3, 3).Value = "Share %"; wbk.Cell(3, 4).Value = "Amount (€)";
+        wbk.Range(3, 1, 3, 4).Style.Font.Bold = true;
+        decimal splitHours = splitLines.Sum(l => l.Hours);
+        int br = 4;
+        foreach (var l in splitLines.OrderByDescending(l => l.AmountCents))
+        {
+            wbk.Cell(br, 1).Value = l.MpsCode ?? "(unmapped)";
+            wbk.Cell(br, 2).Value = (double)l.Hours;
+            wbk.Cell(br, 3).Value = splitHours > 0 ? (double)(l.Hours / splitHours) : 0; wbk.Cell(br, 3).Style.NumberFormat.Format = "0.0%";
+            wbk.Cell(br, 4).Value = l.AmountCents / 100m; wbk.Cell(br, 4).Style.NumberFormat.Format = "#,##0.00";
+            br++;
+        }
+        wbk.Cell(br, 1).Value = "Total"; wbk.Cell(br, 2).Value = (double)splitHours;
+        wbk.Cell(br, 4).Value = splitLines.Sum(l => l.AmountCents) / 100m; wbk.Cell(br, 4).Style.NumberFormat.Format = "#,##0.00";
+        wbk.Range(br, 1, br, 4).Style.Font.Bold = true;
+        wbk.Columns().AdjustToContents();
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+
+        // Filename: YYMM-<refSuffix> - <Consultant>.xlsx
+        string yymm = inv.Period.Length >= 7 ? inv.Period[2..4] + inv.Period[5..7] : inv.Period;
+        string refCode = inv.PaymentRef?.PaymentRefId ?? "";
+        string refSuffix = refCode.Contains('.') ? refCode[(refCode.LastIndexOf('.') + 1)..] : refCode;
+        string raw = $"{yymm}-{refSuffix} - {inv.Consultant}";
+        string name = new string(raw.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray());
+
+        return File(ms.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{name}.xlsx");
     }
 
     [HttpPost("{id:int}/verify")]

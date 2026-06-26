@@ -10,7 +10,7 @@
     "ApiKey": "<your-redmine-api-key>"
   },
   "OpenAI": {
-    "ApiKey": "",
+    "ApiKey": "<your-openai-api-key>",
     "BaseUrl": "https://api.openai.com/v1",
     "Model": "gpt-5.2"
   },

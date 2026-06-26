@@ -25,6 +25,20 @@ public class TaskmanCost
     /// <summary>Euro-cents: hours / 8 × daily_rate (exact, no rounding).</summary>
     public long ComputedAmountCents { get; set; }
 
+    // ── Timelog detail (for the Excel breakdown export) ───────────────────────
+    /// <summary>The day the time was logged (Taskman spent_on).</summary>
+    public DateOnly? EntryDate { get; set; }
+    /// <summary>Redmine activity name (e.g. Development).</summary>
+    public string? Activity { get; set; }
+    /// <summary>Payment Performed Class custom field (intra-muros / extra-muros).</summary>
+    public string? PaymentClass { get; set; }
+    /// <summary>Issue id the entry was logged against.</summary>
+    public int? IssueId { get; set; }
+    /// <summary>Issue subject/title, for the timelog "Issue" column.</summary>
+    public string? IssueSubject { get; set; }
+    /// <summary>Free-text comment on the time entry.</summary>
+    public string? Comment { get; set; }
+
     public int? PaymentRefId { get; set; }
     public string? Consultant { get; set; }
 

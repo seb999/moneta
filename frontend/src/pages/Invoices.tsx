@@ -1,20 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getInvoices, createInvoice, deleteInvoice, getPaymentRefs, getVerification, getSplit, getInvoiceLines, verifyInvoice, disputeInvoice, extractInvoice } from '../api/client'
+import { getInvoices, createInvoice, deleteInvoice, getPaymentRefs, getVerification, getSplit, getInvoiceLines, verifyInvoice, disputeInvoice, extractInvoice, exportInvoiceExcel } from '../api/client'
 import { eur } from '../api/format'
 import { useYear } from '../contexts/YearContext'
 import type { Invoice, PaymentRef, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
-
-function exportSplitCsv(invoice: Invoice, lines: MpsSplitLine[]) {
-  const header = 'MPS Code,Hours,Share %,Amount EUR\n'
-  const body = lines.map(l => `${l.mpsCode},${l.hours.toFixed(2)},${l.sharePct.toFixed(1)},${l.amountEur.toFixed(2)}`).join('\n')
-  const blob = new Blob([header + body], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `split_${invoice.invoiceRef}_${invoice.period}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
+import VerificationReview from '../components/VerificationReview'
+import InvoiceWizard from '../components/InvoiceWizard'
 
 const STATUS_BADGE: Record<string, { bg: string; fg: string }> = {
   received: { bg: '#dbeafe', fg: '#1d4ed8' },
@@ -53,9 +43,6 @@ function VerificationPanel({ invoice, onClose, onChanged }: { invoice: Invoice; 
     finally { setActing(false) }
   }
 
-  const variancePct = v && v.computedEur !== 0 ? (v.varianceEur / v.computedEur) * 100 : 0
-  const within = v ? Math.abs(variancePct) <= 5 : false
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 720 }} onClick={e => e.stopPropagation()}>
@@ -66,125 +53,7 @@ function VerificationPanel({ invoice, onClose, onChanged }: { invoice: Invoice; 
         {error && <p style={{ color: 'var(--clr-danger)', marginBottom: 12 }}>{error}</p>}
         {loading ? <p className="text-muted">Loading…</p> : v && (
           <>
-            {/* Claimed vs computed */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div className="card"><div className="card-body" style={{ textAlign: 'center' }}>
-                <p className="text-muted text-sm">Claimed</p>
-                <p style={{ fontSize: 20, fontWeight: 700 }}>{eur(v.claimedEur)}</p>
-              </div></div>
-              <div className="card"><div className="card-body" style={{ textAlign: 'center' }}>
-                <p className="text-muted text-sm">Computed (Taskman)</p>
-                <p style={{ fontSize: 20, fontWeight: 700 }}>{eur(v.computedEur)}</p>
-                <p className="text-muted text-sm">{v.totalHours.toFixed(1)} h</p>
-              </div></div>
-              <div className="card" style={{ borderColor: within ? 'var(--clr-green)' : 'var(--clr-danger)' }}>
-                <div className="card-body" style={{ textAlign: 'center' }}>
-                  <p className="text-muted text-sm">Variance</p>
-                  <p style={{ fontSize: 20, fontWeight: 700, color: within ? 'var(--clr-green)' : 'var(--clr-danger)' }}>
-                    {eur(v.varianceEur)}
-                  </p>
-                  <p className="text-sm" style={{ color: within ? 'var(--clr-green)' : 'var(--clr-danger)' }}>
-                    {variancePct >= 0 ? '+' : ''}{variancePct.toFixed(1)}% {within ? '· within ±5%' : '· over tolerance'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Developer breakdown */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div className="card-header"><h2>Breakdown — Taskman vs Invoice</h2></div>
-              <div className="table-wrap" style={{ maxHeight: 220, overflowY: 'auto' }}>
-                <table>
-                  <thead><tr>
-                    <th>Developer</th>
-                    <th className="num">Hours</th>
-                    <th className="num" title="Exact: hours ÷ 8 × daily rate (no rounding)">Taskman (€)</th>
-                    <th className="num" title="As billed on the invoice (LLM-extracted line)">Invoice (€)</th>
-                    <th className="num">Diff (€)</th>
-                  </tr></thead>
-                  <tbody>
-                    {v.breakdown.length === 0 ? (
-                      <tr><td colSpan={5} className="empty-state">No Taskman cost for this ref/period. Ingest it first.</td></tr>
-                    ) : v.breakdown.map((b, i) => (
-                      <tr key={i}>
-                        <td className="text-sm">{b.developer}</td>
-                        <td className="num text-sm">{b.hours.toFixed(2)}</td>
-                        <td className="num"><span className="eur">{eur(b.taskmanEur)}</span></td>
-                        <td className="num">{v.hasInvoiceLines ? <span className="eur">{eur(b.invoiceEur)}</span> : <span className="text-muted">—</span>}</td>
-                        <td className="num text-sm" style={{ color: !v.hasInvoiceLines ? 'inherit' : b.diffEur > 0 ? 'var(--clr-danger)' : b.diffEur < 0 ? 'var(--clr-green)' : 'inherit' }}>
-                          {v.hasInvoiceLines ? `${b.diffEur > 0 ? '+' : ''}${eur(b.diffEur)}` : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  {v.breakdown.length > 0 && (
-                    <tfoot>
-                      <tr style={{ borderTop: '2px solid var(--clr-border)', fontWeight: 700, background: 'var(--clr-bg)' }}>
-                        <td className="text-sm">TOTAL</td>
-                        <td className="num text-sm">{v.totalHours.toFixed(2)}</td>
-                        <td className="num"><span className="eur">{eur(v.computedEur)}</span></td>
-                        <td className="num">{v.hasInvoiceLines ? <span className="eur">{eur(v.invoiceLinesTotalEur)}</span> : <span className="text-muted">—</span>}</td>
-                        <td className="num text-sm" style={{ color: v.hasInvoiceLines && v.invoiceLinesTotalEur - v.computedEur > 0 ? 'var(--clr-danger)' : 'inherit' }}>
-                          {v.hasInvoiceLines ? `${v.invoiceLinesTotalEur - v.computedEur > 0 ? '+' : ''}${eur(v.invoiceLinesTotalEur - v.computedEur)}` : '—'}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-              {!v.hasInvoiceLines && (
-                <div className="card-body" style={{ paddingTop: 10 }}>
-                  <p className="text-sm text-muted">
-                    No per-line invoice detail captured — the Invoice column is blank. Upload the invoice PDF at intake
-                    so the extractor can read its line items, or compare against the Claimed total above.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* MPS split */}
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div className="card-header">
-                <h2>MPS split {invoice.status === 'received' && <span className="text-muted text-sm" style={{ fontWeight: 400 }}>(preview)</span>}</h2>
-                {lines.length > 0 && (
-                  <button className="secondary" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => exportSplitCsv(invoice, lines)}>Export CSV</button>
-                )}
-              </div>
-              {split && split.unmappedHours > 0 && (
-                <div style={{ background: '#fef2f2', borderBottom: '1px solid #fecaca', padding: '8px 16px' }}>
-                  <p style={{ color: '#b91c1c', fontSize: 12 }}>
-                    {split.unmappedHours.toFixed(1)}h are unmapped and excluded from the split — map them on the MPS Codes page and re-ingest for an exact split.
-                  </p>
-                </div>
-              )}
-              <div className="table-wrap">
-                <table>
-                  <thead><tr><th>MPS Code</th><th className="num">Hours</th><th className="num">Share</th><th className="num">Amount (€)</th></tr></thead>
-                  <tbody>
-                    {lines.length === 0 ? (
-                      <tr><td colSpan={4} className="empty-state">No MPS-attributed hours. Map categories + re-ingest first.</td></tr>
-                    ) : lines.map((l, i) => (
-                      <tr key={i}>
-                        <td><span className="code-badge">{l.mpsCode}</span></td>
-                        <td className="num text-sm">{l.hours.toFixed(2)}</td>
-                        <td className="num text-sm text-muted">{l.sharePct.toFixed(1)}%</td>
-                        <td className="num"><span className="eur">{eur(l.amountEur)}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  {lines.length > 1 && (
-                    <tfoot>
-                      <tr style={{ fontWeight: 700, borderTop: '2px solid var(--clr-border)' }}>
-                        <td className="text-muted" style={{ fontSize: 12 }}>TOTAL</td>
-                        <td className="num text-sm">{lines.reduce((s, l) => s + l.hours, 0).toFixed(2)}</td>
-                        <td></td>
-                        <td className="num"><span className="eur">{eur(lines.reduce((s, l) => s + l.amountEur, 0))}</span></td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            </div>
+            <VerificationReview invoice={invoice} v={v} split={split} lines={lines} />
 
             {invoice.status === 'received' ? (
               <>
@@ -220,6 +89,7 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
   const [saving, setSaving] = useState(false)
   const [verifyItem, setVerifyItem] = useState<Invoice | null>(null)
 
@@ -247,7 +117,7 @@ export default function Invoices() {
     setError(null); setExtractMsg(null); setExtractedLines([])
     setConsultant(''); setInvoiceRef(''); setPeriod(''); setAmount('')
     setReceivedDate(new Date().toISOString().slice(0, 10))
-    if (refs.length > 0) setPaymentRefId(String(refs[0].id))
+    setPaymentRefId('') // force an explicit choice — don't default to the first ref
     setShowForm(true)
   }
 
@@ -297,11 +167,18 @@ export default function Invoices() {
     try { await deleteInvoice(id); load() } catch (e) { setError(String(e)) }
   }
 
+  async function handleExport(id: number) {
+    try { await exportInvoiceExcel(id) } catch (e) { setError(String(e)) }
+  }
+
   return (
     <>
       <div className="page-header">
         <h1>Invoices — {year}</h1>
-        <button onClick={openForm}>+ Add Invoice</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowWizard(true)} disabled={refs.length === 0}>⚡ Guided verification</button>
+          <button className="secondary" onClick={openForm}>+ Add Invoice</button>
+        </div>
       </div>
       <div className="page-content">
         {error && !showForm && <p style={{ color: 'var(--clr-danger)', marginBottom: 12 }}>{error}</p>}
@@ -335,6 +212,9 @@ export default function Invoices() {
                           <button style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => setVerifyItem(inv)}>
                             {inv.status === 'received' ? 'Verify' : 'View'}
                           </button>
+                          {inv.status === 'verified' && (
+                            <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleExport(inv.id)}>Export Excel</button>
+                          )}
                           <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(inv.id)}>Delete</button>
                         </div>
                       </td>
@@ -373,8 +253,9 @@ export default function Invoices() {
               </div>
               <div className="form-row">
                 <div>
-                  <label>Payment Ref</label>
+                  <label>Payment Ref <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
                   <select value={paymentRefId} onChange={e => setPaymentRefId(e.target.value)} required>
+                    <option value="">— select the payment ref —</option>
                     {refs.map(r => <option key={r.id} value={r.id}>{r.paymentRefId}</option>)}
                   </select>
                 </div>
@@ -394,6 +275,7 @@ export default function Invoices() {
       )}
 
       {verifyItem && <VerificationPanel invoice={verifyItem} onClose={() => setVerifyItem(null)} onChanged={load} />}
+      {showWizard && <InvoiceWizard year={year} refs={refs} onClose={() => setShowWizard(false)} onDone={load} />}
     </>
   )
 }

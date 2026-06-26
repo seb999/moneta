@@ -216,6 +216,21 @@ export interface InvoiceLineInput {
   amountEur: number | null
 }
 
+export interface ReadinessProject {
+  projectId: number
+  name: string
+  ingested: boolean
+  rows: number
+}
+
+export interface Readiness {
+  paymentRefId: number
+  period: string
+  derivedFromHistory: boolean
+  totalCostRows: number
+  projects: ReadinessProject[]
+}
+
 export interface MpsSplitLine {
   mpsCode: string
   hours: number

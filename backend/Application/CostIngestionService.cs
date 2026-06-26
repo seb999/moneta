@@ -168,10 +168,16 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                 string externalRef = $"taskman:{entry.Id}";
 
                 // Resolve the issue Category, then the MPS code via the mapping
-                string category = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var iss)
-                    ? iss.Category?.Name ?? ""
-                    : "";
+                RedmineIssue? iss = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var found) ? found : null;
+                string category = iss?.Category?.Name ?? "";
                 var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Id, entry.Project.Name, category, mapExact, mapProjectDefault, mapProjectDefaultById);
+
+                // Timelog detail for the Excel export
+                DateOnly? entryDate = DateOnly.TryParse(entry.SpentOn, out var d) ? d : null;
+                string? issueSubject = iss?.Subject ?? entry.Issue?.Name;
+                string? activity = entry.Activity?.Name;
+                string? paymentClass = string.IsNullOrEmpty(entry.PaymentPerformedClass) ? null : entry.PaymentPerformedClass;
+                string? comment = string.IsNullOrWhiteSpace(entry.Comments) ? null : entry.Comments;
 
                 var existing = await db.TaskmanCosts
                     .FirstOrDefaultAsync(t => t.ExternalRef == externalRef, ct);
@@ -194,6 +200,12 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                         MpsStatus         = mpsStatus,
                         AttributionStatus = attributionStatus,
                         ExternalRef       = externalRef,
+                        EntryDate         = entryDate,
+                        Activity          = activity,
+                        PaymentClass      = paymentClass,
+                        IssueId           = entry.Issue?.Id,
+                        IssueSubject      = issueSubject,
+                        Comment           = comment,
                     });
                 }
                 else
@@ -209,6 +221,12 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                     existing.MpsCode            = mpsCode;
                     existing.MpsStatus          = mpsStatus;
                     existing.AttributionStatus  = attributionStatus;
+                    existing.EntryDate          = entryDate;
+                    existing.Activity           = activity;
+                    existing.PaymentClass       = paymentClass;
+                    existing.IssueId            = entry.Issue?.Id;
+                    existing.IssueSubject       = issueSubject;
+                    existing.Comment            = comment;
                 }
 
                 switch (attributionStatus)

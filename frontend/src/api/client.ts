@@ -1,4 +1,4 @@
-import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, InvoiceLineInput, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
+import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, InvoiceLineInput, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, Readiness, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
 import { getTaskmanKey } from './taskmanKey'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -199,6 +199,20 @@ export const verifyInvoice = (id: number, data: { verifiedBy?: string; note?: st
   request<void>(`/invoices/${id}/verify`, { method: 'POST', body: JSON.stringify(data) })
 export const disputeInvoice = (id: number, data: { verifiedBy?: string; note?: string }) =>
   request<void>(`/invoices/${id}/dispute`, { method: 'POST', body: JSON.stringify(data) })
+export const getInvoiceReadiness = (paymentRefId: number, period: string) =>
+  request<Readiness>(`/invoices/readiness?paymentRefId=${paymentRefId}&period=${encodeURIComponent(period)}`)
+export const exportInvoiceExcel = async (id: number) => {
+  const res = await fetch(`/api/invoices/${id}/export`)
+  if (!res.ok) throw new Error(await res.text())
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition') || ''
+  const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cd)
+  const filename = m ? decodeURIComponent(m[1]) : `invoice_${id}.xlsx`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 export const getSplit = (id: number) => request<Split>(`/invoices/${id}/split`)
 export const getInvoiceLines = (id: number) => request<MpsSplitLine[]>(`/invoices/${id}/lines`)
 export const extractInvoice = async (file: File, year?: number) => {
