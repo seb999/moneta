@@ -122,6 +122,12 @@ public record TaskmanCostDto(
     string AttributionStatus,
     string? ExternalRef);
 
+// ── MPS ───────────────────────────────────────────────────────────────────────
+
+public record MpsCodeDto(int Id, int FiscalYear, string Code, string? Label, string? Rollup);
+public record CategoryMpsMapDto(int Id, int FiscalYear, string TaskmanProject, string TaskmanCategory, string? MpsCode, bool Excluded, string? Note);
+public record UpsertMappingRequest(int FiscalYear, string TaskmanProject, string? TaskmanCategory, string? MpsCode, bool Excluded, string? Note);
+
 // ── Ingestion ─────────────────────────────────────────────────────────────────
 
 public record IngestRequest(int FiscalYear, string Period, int? ProjectId = null, int? PaymentRefId = null);

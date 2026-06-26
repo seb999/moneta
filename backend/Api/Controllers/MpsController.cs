@@ -1,13 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moneta.Api.Application;
+using Moneta.Api.Dtos;
 using Moneta.Api.Infrastructure;
 
 namespace Moneta.Api.Controllers;
-
-public record MpsCodeDto(int Id, int FiscalYear, string Code, string? Label, string? Rollup);
-public record CategoryMpsMapDto(int Id, int FiscalYear, string TaskmanProject, string TaskmanCategory, string? MpsCode, bool Excluded, string? Note);
-public record UpsertMappingRequest(int FiscalYear, string TaskmanProject, string? TaskmanCategory, string? MpsCode, bool Excluded, string? Note);
 
 [ApiController]
 [Route("api/mps")]
@@ -120,14 +117,13 @@ public class MpsController(MonetaDbContext db, IMpsImportService importer, IConf
         catch (ArgumentException ex) { return BadRequest(ex.Message); }
     }
 
-    /// <summary>Import from the workbook bundled in the dev-plan folder (stop-gap seed).</summary>
+    /// <summary>Import from a configured workbook path (set Mps:ImportFile in config).</summary>
     [HttpPost("import-bundled")]
     public async Task<ActionResult<MpsImportResult>> ImportBundled([FromQuery] int year, CancellationToken ct)
     {
-        var path = config["Mps:ImportFile"]
-                   ?? Path.Combine("..", "dev-plan", "2605-61006 ALTIA TMN2000.xlsx");
-        if (!System.IO.File.Exists(path))
-            return BadRequest($"Bundled workbook not found at '{path}'. Set Mps:ImportFile or upload instead.");
+        var path = config["Mps:ImportFile"];
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+            return BadRequest("Workbook not found. Set Mps:ImportFile in configuration or use the file upload endpoint instead.");
         try
         {
             await using var stream = System.IO.File.OpenRead(path);

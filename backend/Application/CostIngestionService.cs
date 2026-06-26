@@ -160,82 +160,82 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
                 attributionStatus = "unmapped";
             }
 
-                contractorByUserId.TryGetValue(entry.User.Id, out var contractor);
-                long computedCents = ComputeCents(entry, contractor, rateByCompanyProfile, warnings);
-                totalCents += computedCents;
+            contractorByUserId.TryGetValue(entry.User.Id, out var contractor);
+            long computedCents = ComputeCents(entry, contractor, rateByCompanyProfile, warnings);
+            totalCents += computedCents;
 
-                string? consultant = contractor?.Company;
-                string externalRef = $"taskman:{entry.Id}";
+            string? consultant = contractor?.Company;
+            string externalRef = $"taskman:{entry.Id}";
 
-                // Resolve the issue Category, then the MPS code via the mapping
-                RedmineIssue? iss = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var found) ? found : null;
-                string category = iss?.Category?.Name ?? "";
-                var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Id, entry.Project.Name, category, mapExact, mapProjectDefault, mapProjectDefaultById);
+            // Resolve the issue Category, then the MPS code via the mapping
+            RedmineIssue? iss = entry.Issue is not null && issueCache.TryGetValue(entry.Issue.Id, out var found) ? found : null;
+            string category = iss?.Category?.Name ?? "";
+            var (mpsCode, mpsStatus) = ResolveMps(entry.Project.Id, entry.Project.Name, category, mapExact, mapProjectDefault, mapProjectDefaultById);
 
-                // Timelog detail for the Excel export
-                DateOnly? entryDate = DateOnly.TryParse(entry.SpentOn, out var d) ? d : null;
-                string? issueSubject = iss?.Subject ?? entry.Issue?.Name;
-                string? activity = entry.Activity?.Name;
-                string? paymentClass = string.IsNullOrEmpty(entry.PaymentPerformedClass) ? null : entry.PaymentPerformedClass;
-                string? comment = string.IsNullOrWhiteSpace(entry.Comments) ? null : entry.Comments;
+            // Timelog detail for the Excel export
+            DateOnly? entryDate = DateOnly.TryParse(entry.SpentOn, out var d) ? d : null;
+            string? issueSubject = iss?.Subject ?? entry.Issue?.Name;
+            string? activity = entry.Activity?.Name;
+            string? paymentClass = string.IsNullOrEmpty(entry.PaymentPerformedClass) ? null : entry.PaymentPerformedClass;
+            string? comment = string.IsNullOrWhiteSpace(entry.Comments) ? null : entry.Comments;
 
-                var existing = await db.TaskmanCosts
-                    .FirstOrDefaultAsync(t => t.ExternalRef == externalRef, ct);
+            var existing = await db.TaskmanCosts
+                .FirstOrDefaultAsync(t => t.ExternalRef == externalRef, ct);
 
-                if (existing is null)
+            if (existing is null)
+            {
+                db.TaskmanCosts.Add(new TaskmanCost
                 {
-                    db.TaskmanCosts.Add(new TaskmanCost
-                    {
-                        FiscalYear        = fiscalYear,
-                        Period            = period,
-                        TaskmanProject    = entry.Project.Name,
-                        TaskmanCategory   = category,
-                        Developer         = entry.User.Name,
-                        TaskmanUserId     = entry.User.Id,
-                        Hours             = entry.Hours,
-                        ComputedAmountCents = computedCents,
-                        PaymentRefId      = paymentRefDbId,
-                        Consultant        = consultant,
-                        MpsCode           = mpsCode,
-                        MpsStatus         = mpsStatus,
-                        AttributionStatus = attributionStatus,
-                        ExternalRef       = externalRef,
-                        EntryDate         = entryDate,
-                        Activity          = activity,
-                        PaymentClass      = paymentClass,
-                        IssueId           = entry.Issue?.Id,
-                        IssueSubject      = issueSubject,
-                        Comment           = comment,
-                    });
-                }
-                else
-                {
-                    existing.Period             = period;
-                    existing.Developer          = entry.User.Name;
-                    existing.TaskmanUserId      = entry.User.Id;
-                    existing.Hours              = entry.Hours;
-                    existing.ComputedAmountCents = computedCents;
-                    existing.PaymentRefId       = paymentRefDbId;
-                    existing.Consultant         = consultant;
-                    existing.TaskmanCategory    = category;
-                    existing.MpsCode            = mpsCode;
-                    existing.MpsStatus          = mpsStatus;
-                    existing.AttributionStatus  = attributionStatus;
-                    existing.EntryDate          = entryDate;
-                    existing.Activity           = activity;
-                    existing.PaymentClass       = paymentClass;
-                    existing.IssueId            = entry.Issue?.Id;
-                    existing.IssueSubject       = issueSubject;
-                    existing.Comment            = comment;
-                }
-
-                switch (attributionStatus)
-                {
-                    case "mapped":    mapped++;    break;
-                    case "excluded":  excluded++;  break;
-                    default:          unmapped++;  break;
-                }
+                    FiscalYear        = fiscalYear,
+                    Period            = period,
+                    TaskmanProject    = entry.Project.Name,
+                    TaskmanCategory   = category,
+                    Developer         = entry.User.Name,
+                    TaskmanUserId     = entry.User.Id,
+                    Hours             = entry.Hours,
+                    ComputedAmountCents = computedCents,
+                    PaymentRefId      = paymentRefDbId,
+                    Consultant        = consultant,
+                    MpsCode           = mpsCode,
+                    MpsStatus         = mpsStatus,
+                    AttributionStatus = attributionStatus,
+                    ExternalRef       = externalRef,
+                    EntryDate         = entryDate,
+                    Activity          = activity,
+                    PaymentClass      = paymentClass,
+                    IssueId           = entry.Issue?.Id,
+                    IssueSubject      = issueSubject,
+                    Comment           = comment,
+                });
             }
+            else
+            {
+                existing.Period             = period;
+                existing.Developer          = entry.User.Name;
+                existing.TaskmanUserId      = entry.User.Id;
+                existing.Hours              = entry.Hours;
+                existing.ComputedAmountCents = computedCents;
+                existing.PaymentRefId       = paymentRefDbId;
+                existing.Consultant         = consultant;
+                existing.TaskmanCategory    = category;
+                existing.MpsCode            = mpsCode;
+                existing.MpsStatus          = mpsStatus;
+                existing.AttributionStatus  = attributionStatus;
+                existing.EntryDate          = entryDate;
+                existing.Activity           = activity;
+                existing.PaymentClass       = paymentClass;
+                existing.IssueId            = entry.Issue?.Id;
+                existing.IssueSubject       = issueSubject;
+                existing.Comment            = comment;
+            }
+
+            switch (attributionStatus)
+            {
+                case "mapped":    mapped++;    break;
+                case "excluded":  excluded++;  break;
+                default:          unmapped++;  break;
+            }
+        }
 
         await db.SaveChangesAsync(ct);
 
