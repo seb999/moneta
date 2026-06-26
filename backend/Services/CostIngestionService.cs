@@ -3,7 +3,7 @@ using Moneta.Api.Entities;
 using Moneta.Api.Dtos;
 using Moneta.Api.Infrastructure;
 
-namespace Moneta.Api.Application;
+namespace Moneta.Api.Services;
 
 public interface ICostIngestionService
 {

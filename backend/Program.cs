@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Moneta.Api.Application;
+using Moneta.Api.Services;
 using Moneta.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);

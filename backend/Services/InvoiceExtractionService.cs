@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Moneta.Api.Application;
+namespace Moneta.Api.Services;
 
 /// <summary>One billed line read off the invoice (typically one per developer).</summary>
 public record ExtractedInvoiceLine(
