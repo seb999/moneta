@@ -65,7 +65,7 @@ public class MpsController(MonetaDbContext db, IMpsImportService importer, IConf
         if (await db.CategoryMpsMaps.AnyAsync(m => m.FiscalYear == req.FiscalYear && m.TaskmanProject == project && m.TaskmanCategory == category))
             return Conflict($"A rule for ({project}, {(category == "" ? "blank" : category)}) already exists for {req.FiscalYear}.");
 
-        var entity = new Domain.CategoryMpsMap
+        var entity = new Entities.CategoryMpsMap
         {
             FiscalYear      = req.FiscalYear,
             TaskmanProject  = project,

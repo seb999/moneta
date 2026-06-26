@@ -1,4 +1,4 @@
-namespace Moneta.Api.Domain;
+namespace Moneta.Api.Entities;
 
 /// <summary>
 /// COMPUTED cost reference derived from Taskman time entries — NOT booked spend.

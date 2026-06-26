@@ -1,4 +1,4 @@
-namespace Moneta.Api.Domain;
+namespace Moneta.Api.Entities;
 
 /// <summary>
 /// Maps a Taskman (Project, Category) pair to an MPS code, per fiscal year.

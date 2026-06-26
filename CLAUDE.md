@@ -42,7 +42,7 @@ npm run lint
 ## Architecture
 
 - **Backend**: `backend/` — ASP.NET Core Web API
-  - `Domain/` — entity classes (no logic, no EF references)
+  - `Entities/` — EF entity classes (data only, no logic)
   - `Infrastructure/MonetaDbContext.cs` — EF Core DbContext with SQLite
   - `Api/Controllers/` — REST controllers
   - DB file written to `backend/data/moneta.db` (git-ignored)

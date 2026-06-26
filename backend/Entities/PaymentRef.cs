@@ -1,4 +1,4 @@
-namespace Moneta.Api.Domain;
+namespace Moneta.Api.Entities;
 
 /// <summary>
 /// Tracks budget (appropriations, commitments, actuals) per Taskman payment_ref_id.

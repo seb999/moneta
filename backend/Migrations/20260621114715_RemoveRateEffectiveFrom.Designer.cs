@@ -20,7 +20,7 @@ namespace Moneta.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
-            modelBuilder.Entity("Moneta.Api.Domain.Actual", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Actual", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -69,7 +69,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Actuals");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Appropriation", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Appropriation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -108,7 +108,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Appropriations");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Commitment", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Commitment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -144,7 +144,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Commitments");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Contractor", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Contractor", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -166,7 +166,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Contractors");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.ContractorRate", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.ContractorRate", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -188,7 +188,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("ContractorRates");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.FiscalYear", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.FiscalYear", b =>
                 {
                     b.Property<int>("Year")
                         .ValueGeneratedOnAdd()
@@ -203,7 +203,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("FiscalYears");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Invoice", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Invoice", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -253,7 +253,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("Invoices");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.InvoiceLine", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.InvoiceLine", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -280,7 +280,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("InvoiceLines");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.PaymentRef", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.PaymentRef", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -305,7 +305,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("PaymentRefs");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.TaskmanCost", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.TaskmanCost", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -356,7 +356,7 @@ namespace Moneta.Api.Migrations
                     b.ToTable("TaskmanCosts");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.TaskmanProject", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.TaskmanProject", b =>
                 {
                     b.Property<int>("ProjectId")
                         .ValueGeneratedOnAdd()
@@ -377,17 +377,17 @@ namespace Moneta.Api.Migrations
                     b.ToTable("TaskmanProjects");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Actual", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Actual", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.Commitment", "Commitment")
+                    b.HasOne("Moneta.Api.Entities.Commitment", "Commitment")
                         .WithMany("Actuals")
                         .HasForeignKey("CommitmentId");
 
-                    b.HasOne("Moneta.Api.Domain.Invoice", "Invoice")
+                    b.HasOne("Moneta.Api.Entities.Invoice", "Invoice")
                         .WithMany("Actuals")
                         .HasForeignKey("InvoiceId");
 
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany("Actuals")
                         .HasForeignKey("PaymentRefId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -400,9 +400,9 @@ namespace Moneta.Api.Migrations
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Appropriation", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Appropriation", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany("Appropriations")
                         .HasForeignKey("PaymentRefId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -411,9 +411,9 @@ namespace Moneta.Api.Migrations
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Commitment", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Commitment", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany("Commitments")
                         .HasForeignKey("PaymentRefId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -422,9 +422,9 @@ namespace Moneta.Api.Migrations
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.ContractorRate", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.ContractorRate", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.Contractor", "Contractor")
+                    b.HasOne("Moneta.Api.Entities.Contractor", "Contractor")
                         .WithMany("Rates")
                         .HasForeignKey("ContractorId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -433,24 +433,24 @@ namespace Moneta.Api.Migrations
                     b.Navigation("Contractor");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Invoice", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Invoice", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany("Invoices")
                         .HasForeignKey("PaymentRefId");
 
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.InvoiceLine", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.InvoiceLine", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.Invoice", "Invoice")
+                    b.HasOne("Moneta.Api.Entities.Invoice", "Invoice")
                         .WithMany("Lines")
                         .HasForeignKey("InvoiceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany()
                         .HasForeignKey("PaymentRefId");
 
@@ -459,9 +459,9 @@ namespace Moneta.Api.Migrations
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.PaymentRef", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.PaymentRef", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.FiscalYear", "Year")
+                    b.HasOne("Moneta.Api.Entities.FiscalYear", "Year")
                         .WithMany("PaymentRefs")
                         .HasForeignKey("FiscalYear")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -470,38 +470,38 @@ namespace Moneta.Api.Migrations
                     b.Navigation("Year");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.TaskmanCost", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.TaskmanCost", b =>
                 {
-                    b.HasOne("Moneta.Api.Domain.PaymentRef", "PaymentRef")
+                    b.HasOne("Moneta.Api.Entities.PaymentRef", "PaymentRef")
                         .WithMany("TaskmanCosts")
                         .HasForeignKey("PaymentRefId");
 
                     b.Navigation("PaymentRef");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Commitment", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Commitment", b =>
                 {
                     b.Navigation("Actuals");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Contractor", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Contractor", b =>
                 {
                     b.Navigation("Rates");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.FiscalYear", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.FiscalYear", b =>
                 {
                     b.Navigation("PaymentRefs");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.Invoice", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.Invoice", b =>
                 {
                     b.Navigation("Actuals");
 
                     b.Navigation("Lines");
                 });
 
-            modelBuilder.Entity("Moneta.Api.Domain.PaymentRef", b =>
+            modelBuilder.Entity("Moneta.Api.Entities.PaymentRef", b =>
                 {
                     b.Navigation("Actuals");
 

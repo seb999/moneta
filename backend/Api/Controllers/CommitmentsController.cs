@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Moneta.Api.Domain;
+using Moneta.Api.Entities;
 using Moneta.Api.Dtos;
 using Moneta.Api.Infrastructure;
 

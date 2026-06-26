@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Moneta.Api.Domain;
+using Moneta.Api.Entities;
 
 namespace Moneta.Api.Infrastructure;
 

@@ -49,7 +49,7 @@ public class IngestionController(ICostIngestionService ingestion, MonetaDbContex
             {
                 var existing = await db.TaskmanProjects.FindAsync([p.Id], ct);
                 if (existing is null)
-                    db.TaskmanProjects.Add(new Domain.TaskmanProject { ProjectId = p.Id, Name = p.Name, LastSynced = DateTime.UtcNow });
+                    db.TaskmanProjects.Add(new Entities.TaskmanProject { ProjectId = p.Id, Name = p.Name, LastSynced = DateTime.UtcNow });
                 else { existing.Name = p.Name; existing.LastSynced = DateTime.UtcNow; }
             }
             await db.SaveChangesAsync(ct);

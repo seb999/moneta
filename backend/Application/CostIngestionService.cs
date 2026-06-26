@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Moneta.Api.Domain;
+using Moneta.Api.Entities;
 using Moneta.Api.Dtos;
 using Moneta.Api.Infrastructure;
 
@@ -250,9 +250,9 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
     /// </summary>
     private static (string? Code, string Status) ResolveMps(
         int projectId, string project, string category,
-        Dictionary<(string, string), Domain.CategoryMpsMap> exact,
-        Dictionary<string, Domain.CategoryMpsMap> projectDefault,
-        Dictionary<int, Domain.CategoryMpsMap> projectDefaultById)
+        Dictionary<(string, string), Entities.CategoryMpsMap> exact,
+        Dictionary<string, Entities.CategoryMpsMap> projectDefault,
+        Dictionary<int, Entities.CategoryMpsMap> projectDefaultById)
     {
         if (!string.IsNullOrEmpty(category) && exact.TryGetValue((project, category), out var m))
             return m.Excluded ? (null, "excluded") : (m.MpsCode, "mapped");

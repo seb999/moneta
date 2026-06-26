@@ -1,4 +1,4 @@
-namespace Moneta.Api.Domain;
+namespace Moneta.Api.Entities;
 
 /// <summary>
 /// Daily-rate card for an EU framework contract: one rate per (company, profile).

@@ -1,4 +1,4 @@
-namespace Moneta.Api.Domain;
+namespace Moneta.Api.Entities;
 
 /// <summary>
 /// EEA Management-Plan code (three-part, e.g. "1.1.0" / "4.3.9"), per fiscal year.

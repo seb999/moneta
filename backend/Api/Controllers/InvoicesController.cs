@@ -4,7 +4,7 @@ using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moneta.Api.Application;
-using Moneta.Api.Domain;
+using Moneta.Api.Entities;
 using Moneta.Api.Infrastructure;
 
 namespace Moneta.Api.Controllers;
