@@ -6,6 +6,7 @@ import {
 import { eur } from '../api/format'
 import type { PaymentRef, Readiness, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
 import VerificationReview from './VerificationReview'
+import ExtractionProgress from './ExtractionProgress'
 
 const STEPS = ['Upload', 'Confirm', 'Taskman data', 'Review', 'Decision']
 
@@ -165,7 +166,7 @@ export default function InvoiceWizard(
               Upload the invoice PDF to auto-fill the fields and read its line items, or skip to enter manually.
             </p>
             <input type="file" accept="application/pdf,.pdf" onChange={handleFile} disabled={extracting} />
-            {extracting && <p className="text-muted text-sm" style={{ marginTop: 8 }}>Reading PDF…</p>}
+            <ExtractionProgress extracting={extracting} />
             {extractMsg && <p className="text-sm" style={{ marginTop: 8, color: 'var(--clr-green)' }}>{extractMsg}</p>}
           </div>
         )}

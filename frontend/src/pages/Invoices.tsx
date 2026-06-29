@@ -5,6 +5,7 @@ import { useYear } from '../contexts/YearContext'
 import type { Invoice, PaymentRef, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
 import VerificationReview from '../components/VerificationReview'
 import InvoiceWizard from '../components/InvoiceWizard'
+import ExtractionProgress from '../components/ExtractionProgress'
 
 const STATUS_BADGE: Record<string, { bg: string; fg: string }> = {
   received: { bg: '#dbeafe', fg: '#1d4ed8' },
@@ -237,7 +238,7 @@ export default function Invoices() {
                 Upload the PDF and the assistant extracts consultant, period and amount. Review every field before saving.
               </p>
               <input type="file" accept="application/pdf,.pdf" onChange={handleExtract} disabled={extracting} />
-              {extracting && <p className="text-muted text-sm" style={{ marginTop: 6 }}>Reading PDF…</p>}
+              <ExtractionProgress extracting={extracting} />
               {extractMsg && <p className="text-sm" style={{ marginTop: 6, color: 'var(--clr-green)' }}>{extractMsg}</p>}
             </div>
             {refs.length === 0 && (
