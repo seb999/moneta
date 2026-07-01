@@ -179,7 +179,7 @@ export default function Commitments() {
                 <div>
                   <label>Payment Ref</label>
                   <select value={paymentRefId} onChange={e => setPaymentRefId(e.target.value)} required>
-                    {refs.map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
+                    {refs.filter(r => r.isActive || String(r.id) === paymentRefId).map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
                   </select>
                 </div>
               </div>

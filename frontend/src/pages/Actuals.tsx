@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { getActuals, getPaymentRefs, createActual, deleteActual } from '../api/client'
 import { eur } from '../api/format'
+import BinButton from '../components/BinButton'
 import { useYear } from '../contexts/YearContext'
 import type { Actual, PaymentRef } from '../api/types'
 
@@ -9,9 +10,18 @@ export default function Actuals() {
   const [items, setItems] = useState<Actual[]>([])
   const [refs, setRefs] = useState<PaymentRef[]>([])
   const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  function toggle(code: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code); else next.add(code)
+      return next
+    })
+  }
 
   const [paymentRefId, setPaymentRefId] = useState('')
   const [period, setPeriod] = useState('')
@@ -96,22 +106,48 @@ export default function Actuals() {
                   <tr><td colSpan={8} className="empty-state">Loading…</td></tr>
                 ) : items.length === 0 ? (
                   <tr><td colSpan={8} className="empty-state">No actuals for {year}.</td></tr>
-                ) : items.map(a => (
-                  <tr key={a.id}>
-                    <td><span className="code-badge" style={{ fontFamily: 'monospace', fontSize: 11 }}>{a.paymentRefCode}</span></td>
-                    <td className="text-sm" style={{ fontFamily: 'monospace' }}>{a.period}</td>
-                    <td className="text-sm text-muted">{a.date}</td>
-                    <td className="text-muted text-sm">{a.consultant ?? '—'}</td>
-                    <td className="text-sm text-muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description ?? '—'}</td>
-                    <td><span style={{ fontSize: 11, fontWeight: 600, color: sourceColor[a.source] ?? 'inherit', textTransform: 'capitalize' }}>{a.source}</span></td>
-                    <td className="num"><span className="eur">{eur(a.amountEur)}</span></td>
-                    <td>
-                      {a.source === 'manual' && (
-                        <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(a.id)}>Delete</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                ) : (() => {
+                  const groups = new Map<string, Actual[]>()
+                  for (const a of items) {
+                    if (!groups.has(a.paymentRefCode)) groups.set(a.paymentRefCode, [])
+                    groups.get(a.paymentRefCode)!.push(a)
+                  }
+                  return [...groups.entries()].map(([code, groupItems]) => {
+                    const open = !collapsed.has(code)
+                    const groupTotal = groupItems.reduce((s, a) => s + a.amountEur, 0)
+                    return (
+                      <Fragment key={code}>
+                        <tr onClick={() => toggle(code)} style={{ cursor: 'pointer', background: 'var(--clr-bg-soft, #f8fafc)', userSelect: 'none' }}>
+                          <td colSpan={4}>
+                            <span style={{ marginRight: 6, fontSize: 10, color: 'var(--clr-muted)' }}>{open ? '▼' : '▶'}</span>
+                            <span className="code-badge" style={{ fontFamily: 'monospace', fontSize: 11 }}>{code}</span>
+                            <span className="text-muted text-sm" style={{ marginLeft: 8 }}>{groupItems.length} {groupItems.length === 1 ? 'entry' : 'entries'}</span>
+                          </td>
+                          <td></td>
+                          <td></td>
+                          <td className="num" style={{ fontWeight: 600 }}><span className="eur">{eur(groupTotal)}</span></td>
+                          <td></td>
+                        </tr>
+                        {open && groupItems.map(a => (
+                          <tr key={a.id}>
+                            <td></td>
+                            <td className="text-sm" style={{ fontFamily: 'monospace' }}>{a.period}</td>
+                            <td className="text-sm text-muted">{a.date}</td>
+                            <td className="text-muted text-sm">{a.consultant ?? '—'}</td>
+                            <td className="text-sm text-muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.description ?? '—'}</td>
+                            <td><span style={{ fontSize: 11, fontWeight: 600, color: sourceColor[a.source] ?? 'inherit', textTransform: 'capitalize' }}>{a.source}</span></td>
+                            <td className="num"><span className="eur">{eur(a.amountEur)}</span></td>
+                            <td>
+                              {a.source === 'manual' && (
+                                <BinButton onClick={() => handleDelete(a.id)} />
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    )
+                  })
+                })()}
               </tbody>
             </table>
           </div>
@@ -128,7 +164,7 @@ export default function Actuals() {
                 <div>
                   <label>Payment Ref</label>
                   <select value={paymentRefId} onChange={e => setPaymentRefId(e.target.value)} required>
-                    {refs.map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
+                    {refs.filter(r => r.isActive || String(r.id) === paymentRefId).map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
                   </select>
                 </div>
               </div>

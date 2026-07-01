@@ -67,13 +67,18 @@ public class InvoiceExtractionService(IConfiguration config, IHttpClientFactory 
     """)!.AsObject();
 
     const string Prompt = """
-        You are extracting structured data from a consultant invoice (PDF) for the European Environment Agency.
-        Read the document and return only the requested fields. Rules:
-        - period: the month the work was performed/billed, as YYYY-MM. If a date range, use the month that the bulk of the work falls in.
-        - claimedAmountEur: the headline total payable in euros. If VAT is shown, use the gross total payable unless a clearly-labelled net total is the contractual amount.
-        - paymentRefHint: copy any contract / framework / payment-reference string verbatim.
-        - lines: extract every itemised detail row (usually one per developer/consultant) with its developer name, hours and euro amount. If the invoice has no itemised breakdown, return an empty array.
-        - Use null for any field you cannot determine with confidence. Do not guess.
+        You are extracting structured data from a consultant invoice PDF for the European Environment Agency (EEA).
+        These are IT consulting invoices — they typically list individual developers/consultants with their hours or days worked and the billed amount per person.
+        Return only the requested JSON fields. Rules:
+
+        - consultant: the name of the supplier company that issued the invoice (not the EEA, not an individual person).
+        - invoiceRef: the invoice number or reference printed on the document.
+        - period: the month the work was performed, as YYYY-MM. If a date range spans one month, use that month. If it spans two months, use the month with the most days in the range.
+        - claimedAmountEur: the total amount payable in euros (the bottom-line figure, excluding VAT if the contract is net-based, otherwise gross). Return as a plain number.
+        - paymentRefHint: copy verbatim any EEA contract reference, purchase order number or framework reference you see (e.g. "EEA/DTL/25/015/EEA.61006"). This is typically printed near the top of the invoice.
+        - lines: THIS IS IMPORTANT — look carefully for any table or list that shows individual people's work. Each row typically has: a person's full name, the number of days or hours they worked, and the amount billed for them. Extract every such row. Convert days to hours by multiplying by 8 if hours are not shown. If you see a summary table with names and amounts but no hours, still capture developer and amountEur with hours as null. Return an empty array ONLY if the invoice truly has no per-person breakdown at all.
+        - notes: flag any ambiguity, missing fields, or anything the officer should review. Null if nothing notable.
+        - Use null for fields you cannot determine. Do not invent data.
         """;
 
     public async Task<ExtractedInvoice> ExtractAsync(byte[] pdfBytes, CancellationToken ct = default)
@@ -82,7 +87,7 @@ public class InvoiceExtractionService(IConfiguration config, IHttpClientFactory 
             throw new InvalidOperationException("OpenAI API key is not configured (OpenAI:ApiKey).");
 
         var baseUrl = (config["OpenAI:BaseUrl"] ?? "https://api.openai.com/v1").TrimEnd('/');
-        var model   = config["OpenAI:ExtractionModel"] ?? "gpt-4o";
+        var model   = config["OpenAI:Model"] ?? config["OpenAI:ExtractionModel"] ?? "gpt-4o";
         var base64  = Convert.ToBase64String(pdfBytes);
 
         var payload = new JsonObject

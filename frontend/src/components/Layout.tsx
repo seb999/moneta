@@ -21,6 +21,7 @@ export default function Layout() {
           <span>EEA Budget Management</span>
         </div>
         <nav>
+          <div style={{ padding: '12px 20px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--clr-primary)' }}>Budget</div>
           <NavLink to="/" end className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Budget Overview
           </NavLink>
@@ -34,9 +35,7 @@ export default function Layout() {
             Actuals
           </NavLink>
 
-          <hr style={{ border: 0, borderTop: '1px solid var(--clr-border)', margin: '10px 16px' }} />
-
-          
+          <div style={{ padding: '14px 20px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--clr-primary)', borderTop: '1px solid var(--clr-border)', marginTop: 8 }}>Taskman & Invoices</div>
           <NavLink to="/ingestion" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Taskman Ingestion
           </NavLink>
@@ -47,10 +46,12 @@ export default function Layout() {
             Invoices
           </NavLink>
 
-          <hr style={{ border: 0, borderTop: '1px solid var(--clr-border)', margin: '10px 16px' }} />
-
+          <div style={{ padding: '14px 20px 4px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--clr-primary)', borderTop: '1px solid var(--clr-border)', marginTop: 8 }}>Setup</div>
           <NavLink to="/payment-refs" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Payment Refs
+          </NavLink>
+          <NavLink to="/companies" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+            Companies
           </NavLink>
           <NavLink to="/contractors" className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
             Contractors & Rates

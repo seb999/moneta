@@ -130,7 +130,7 @@ export default function WorkEffort() {
                     onChange={e => setSelectedRefId(Number(e.target.value))}
                   >
                     {paymentRefs.length === 0 && <option value="">— no refs —</option>}
-                    {paymentRefs.map(r => (
+                    {paymentRefs.filter(r => r.isActive).map(r => (
                       <option key={r.id} value={r.id}>{r.paymentRefId}{r.description ? ` — ${r.description}` : ''}</option>
                     ))}
                   </select>

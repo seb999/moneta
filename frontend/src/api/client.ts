@@ -1,4 +1,4 @@
-import type { Appropriation, Actual, CategoryMpsMap, Commitment, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, InvoiceLineInput, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, Readiness, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
+import type { Appropriation, Actual, CategoryMpsMap, Commitment, Company, Contractor, DiscoveredUser, ExtractedInvoice, FiscalYear, IngestSummary, Invoice, InvoiceLineInput, MonthlySummaryRow, MpsCode, MpsImportResult, MpsSplitLine, PaymentRef, PaymentRefSummary, RateCard, Readiness, RedmineProject, Split, TaskmanCost, UnmappedPair, Verification } from './types'
 import { getTaskmanKey } from './taskmanKey'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -19,6 +19,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// Companies
+export const getCompanies = () => request<Company[]>('/companies')
+export const createCompany = (name: string) => request<Company>('/companies', { method: 'POST', body: JSON.stringify({ name }) })
+export const deleteCompany = (id: number) => request<void>(`/companies/${id}`, { method: 'DELETE' })
+
 // Fiscal Years
 export const getFiscalYears = () => request<FiscalYear[]>('/fiscal-years')
 export const createFiscalYear = (year: number, status = 'open') =>
@@ -35,6 +40,8 @@ export const updatePaymentRef = (id: number, data: Omit<PaymentRef, 'id'>) =>
   request<void>(`/payment-refs/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const deletePaymentRef = (id: number) =>
   request<void>(`/payment-refs/${id}`, { method: 'DELETE' })
+export const setPaymentRefActive = (id: number, isActive: boolean) =>
+  request<void>(`/payment-refs/${id}/active`, { method: 'PATCH', body: JSON.stringify({ isActive }) })
 export const syncPaymentRefsFromTaskman = (year: number, projectId: number) =>
   request<{ foundInTaskman: number; created: number; createdRefs: string[] }>(
     `/payment-refs/sync-from-taskman?year=${year}&projectId=${projectId}`, { method: 'POST' })
@@ -193,6 +200,8 @@ export const createInvoice = (data: {
   paymentRefId: number; claimedAmountEur: number; receivedDate?: string; note?: string
   lines?: InvoiceLineInput[]
 }) => request<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) })
+export const updateInvoice = (id: number, data: { consultant: string; invoiceRef: string; period: string; paymentRefId: number; claimedAmountEur: number }) =>
+  request<void>(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const deleteInvoice = (id: number) => request<void>(`/invoices/${id}`, { method: 'DELETE' })
 export const getVerification = (id: number) => request<Verification>(`/invoices/${id}/verification`)
 export const verifyInvoice = (id: number, data: { verifiedBy?: string; note?: string }) =>

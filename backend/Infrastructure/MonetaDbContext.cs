@@ -19,6 +19,7 @@ public class MonetaDbContext(DbContextOptions<MonetaDbContext> options) : DbCont
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<MpsCode> MpsCodes => Set<MpsCode>();
     public DbSet<CategoryMpsMap> CategoryMpsMaps => Set<CategoryMpsMap>();
+    public DbSet<Company> Companies => Set<Company>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {

@@ -10,6 +10,7 @@ import Invoices from './pages/Invoices'
 import Ingestion from './pages/Ingestion'
 import WorkEffort from './pages/WorkEffort'
 import Contractors from './pages/Contractors'
+import Companies from './pages/Companies'
 import MpsCodes from './pages/MpsCodes'
 import FiscalYears from './pages/FiscalYears'
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="ingestion" element={<Ingestion />} />
             <Route path="work-effort" element={<WorkEffort />} />
             <Route path="contractors" element={<Contractors />} />
+            <Route path="companies" element={<Companies />} />
             <Route path="mps-codes" element={<MpsCodes />} />
             <Route path="fiscal-years" element={<FiscalYears />} />
           </Route>

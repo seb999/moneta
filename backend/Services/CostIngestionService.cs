@@ -32,10 +32,10 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             .ToListAsync(ct);
         var contractorByUserId = contractors.ToDictionary(c => c.TaskmanUserId!.Value);
 
-        // Rate cards keyed by (company, profile)
+        // Rate cards keyed by (company, profile) — lower-cased to tolerate case mismatches
         var rateCards = await db.RateCards.ToListAsync(ct);
         var rateByCompanyProfile = rateCards.ToDictionary(
-            r => (r.Company, r.Profile),
+            r => (r.Company.ToLowerInvariant(), r.Profile.ToLowerInvariant()),
             r => r);
 
         // Category → MPS mapping for this year. Two lookups:
@@ -280,7 +280,7 @@ public class CostIngestionService(MonetaDbContext db, IRedmineClient redmine) : 
             return 0;
         }
 
-        if (!rateByCompanyProfile.TryGetValue((contractor.Company, contractor.Profile), out var card))
+        if (!rateByCompanyProfile.TryGetValue((contractor.Company.ToLowerInvariant(), contractor.Profile.ToLowerInvariant()), out var card))
         {
             warnings.Add($"No rate card for {contractor.Company} / {contractor.Profile} — cost set to 0.");
             return 0;

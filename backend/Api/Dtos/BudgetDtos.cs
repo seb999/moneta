@@ -1,5 +1,10 @@
 namespace Moneta.Api.Dtos;
 
+// ── Company ──────────────────────────────────────────────────────────────────
+
+public record CompanyDto(int Id, string Name);
+public record CreateCompanyRequest(string Name);
+
 // ── Fiscal Year ──────────────────────────────────────────────────────────────
 
 public record FiscalYearDto(int Year, string Status);
@@ -7,10 +12,11 @@ public record CreateFiscalYearRequest(int Year, string Status = "open");
 
 // ── Payment Ref ──────────────────────────────────────────────────────────────
 
-public record PaymentRefDto(int Id, int FiscalYear, string PaymentRefId, string Description);
+public record PaymentRefDto(int Id, int FiscalYear, string PaymentRefId, string Description, bool IsActive);
 
 public record CreatePaymentRefRequest(int FiscalYear, string PaymentRefId, string Description);
 public record SyncPaymentRefsResult(int FoundInTaskman, int Created, List<string> CreatedRefs);
+public record SetActiveRequest(bool IsActive);
 
 /// <summary>
 /// One row in the budget summary: budget → committed → spent → remaining.

@@ -13,6 +13,10 @@ public record CreateInvoiceRequest(
     int PaymentRefId, decimal ClaimedAmountEur, DateOnly? ReceivedDate, string? Note,
     List<InvoiceLineInput>? Lines = null);
 
+public record UpdateInvoiceRequest(
+    string Consultant, string InvoiceRef, string Period,
+    int PaymentRefId, decimal ClaimedAmountEur);
+
 /// <summary>One row of the verification breakdown: exact Taskman cost vs the amount billed on the invoice.</summary>
 public record DeveloperLineDto(string Developer, decimal Hours, decimal TaskmanEur, decimal InvoiceEur, decimal DiffEur);
 

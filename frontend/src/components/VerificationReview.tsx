@@ -21,8 +21,25 @@ export default function VerificationReview(
   const variancePct = v.computedEur !== 0 ? (v.varianceEur / v.computedEur) * 100 : 0
   const within = Math.abs(variancePct) <= 5
 
+  const hasHoursButNoAmount = v.totalHours > 0 && v.computedEur === 0
+
   return (
     <>
+      {hasHoursButNoAmount && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 14px', marginBottom: 14, fontSize: 13 }}>
+          <strong style={{ color: '#92400e' }}>Hours found but computed cost is €0.</strong>
+          {' '}<span style={{ color: '#78350f' }}>One or more developers have no profile or no matching rate card.
+          Fix in <strong>Contractors & Rates</strong> (assign a profile) and <strong>Companies</strong> (add rate card), then re-ingest this period.</span>
+        </div>
+      )}
+      {v.breakdown.length === 0 && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 14px', marginBottom: 14, fontSize: 13 }}>
+          <strong style={{ color: '#92400e' }}>No Taskman rows found</strong>
+          {' '}<span style={{ color: '#78350f' }}>for ref <strong>{v.paymentRefCode ?? '(none)'}</strong>, period <strong>{v.period}</strong>.
+          Check that the invoice period matches what was ingested (format: YYYY-MM).</span>
+        </div>
+      )}
+
       {/* Claimed vs computed */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
         <div className="card"><div className="card-body" style={{ textAlign: 'center' }}>
@@ -61,7 +78,7 @@ export default function VerificationReview(
             </tr></thead>
             <tbody>
               {v.breakdown.length === 0 ? (
-                <tr><td colSpan={5} className="empty-state">No Taskman cost for this ref/period. Ingest it first.</td></tr>
+                <tr><td colSpan={5} className="empty-state">No Taskman rows — see warning above.</td></tr>
               ) : v.breakdown.map((b, i) => (
                 <tr key={i}>
                   <td className="text-sm">{b.developer}</td>
@@ -92,8 +109,7 @@ export default function VerificationReview(
         {!v.hasInvoiceLines && (
           <div className="card-body" style={{ paddingTop: 10 }}>
             <p className="text-sm text-muted">
-              No per-line invoice detail captured — the Invoice column is blank. Upload the invoice PDF at intake
-              so the extractor can read its line items, or compare against the Claimed total above.
+              No per-developer line detail — the Invoice column is blank. That's fine: use the <strong>Claimed</strong> vs <strong>Computed (Taskman)</strong> totals above to decide whether to verify or dispute.
             </p>
           </div>
         )}

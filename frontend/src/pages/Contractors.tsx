@@ -2,38 +2,33 @@ import { useEffect, useState } from 'react'
 import {
   getContractors, createContractor, updateContractor, deleteContractor,
   discoverContractors, discoverContractorsByRef, bulkImportContractors,
-  getRateCards, upsertRateCard, deleteRateCard, getPaymentRefs,
+  getRateCards, getPaymentRefs,
+  getCompanies,
 } from '../api/client'
 import { eur } from '../api/format'
+import BinButton from '../components/BinButton'
 import { useYear } from '../contexts/YearContext'
-import type { Contractor, DiscoveredUser, RateCard, PaymentRef } from '../api/types'
-
-const COMPANIES = ['Tracasa', 'Altia', 'Bilbomatica', 'Other']
+import type { Company, Contractor, DiscoveredUser, RateCard, PaymentRef } from '../api/types'
 
 export default function Contractors() {
   const { year } = useYear()
   const [items, setItems] = useState<Contractor[]>([])
   const [rateCards, setRateCards] = useState<RateCard[]>([])
   const [paymentRefs, setPaymentRefs] = useState<PaymentRef[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Inline name editing (other fields save immediately on change)
+  // Inline name editing
   const [editingNames, setEditingNames] = useState<Record<number, string>>({})
 
   // Add row
   const [addingRow, setAddingRow] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newCompany, setNewCompany] = useState(COMPANIES[0])
+  const [newCompany, setNewCompany] = useState('')
   const [newProfile, setNewProfile] = useState('')
   const [newTaskmanId, setNewTaskmanId] = useState('')
   const [addingSaving, setAddingSaving] = useState(false)
-
-  // Rate card form
-  const [rcCompany, setRcCompany] = useState(COMPANIES[0])
-  const [rcProfile, setRcProfile] = useState('')
-  const [rcDaily, setRcDaily] = useState('')
-  const [rcIntra, setRcIntra] = useState('')
 
   // Discovery
   const [discoverMode, setDiscoverMode] = useState<'ref' | 'project'>('ref')
@@ -60,6 +55,9 @@ export default function Contractors() {
       if (refs.length > 0) setDiscoverRefId(refs[0].id)
     }).catch(() => {})
   }, [year])
+  useEffect(() => {
+    getCompanies().then(setCompanies).catch(() => {})
+  }, [])
 
   const profilesFor = (comp: string) => rateCards.filter(rc => rc.company === comp).map(rc => rc.profile)
   const rateFor = (c: Contractor) =>
@@ -102,27 +100,10 @@ export default function Contractors() {
     e.preventDefault(); setAddingSaving(true); setError(null)
     try {
       await createContractor({ name: newName, company: newCompany, profile: newProfile || null, taskmanUserId: newTaskmanId ? Number(newTaskmanId) : undefined })
-      setAddingRow(false); setNewName(''); setNewCompany(COMPANIES[0]); setNewProfile(''); setNewTaskmanId('')
+      setAddingRow(false); setNewName(''); setNewCompany(''); setNewProfile(''); setNewTaskmanId('')
       load()
     } catch (e) { setError(String(e)) }
     finally { setAddingSaving(false) }
-  }
-
-  // ── Rate cards ───────────────────────────────────────────────────────────────
-
-  async function handleSaveRateCard(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (!rcProfile || !rcDaily) return
-    try {
-      await upsertRateCard({ company: rcCompany, profile: rcProfile, dailyRateEur: Number(rcDaily), intraMurosRateEur: rcIntra ? Number(rcIntra) : null })
-      setRcProfile(''); setRcDaily(''); setRcIntra('')
-      load()
-    } catch (e) { setError(String(e)) }
-  }
-
-  async function handleDeleteRateCard(id: number) {
-    if (!confirm('Delete this rate card?')) return
-    try { await deleteRateCard(id); load() } catch (e) { setError(String(e)) }
   }
 
   // ── Discovery ────────────────────────────────────────────────────────────────
@@ -135,7 +116,7 @@ export default function Contractors() {
         : await discoverContractors(Number(discoverProjectId), 12)
       setDiscovered(users)
       const dc: Record<number, string> = {}, dp: Record<number, string> = {}
-      users.forEach(u => { if (u.taskmanUserId != null) { dc[u.taskmanUserId] = COMPANIES[0]; dp[u.taskmanUserId] = '' } })
+      users.forEach(u => { if (u.taskmanUserId != null) { dc[u.taskmanUserId] = companies[0]?.name ?? ''; dp[u.taskmanUserId] = '' } })
       setSelCompany(dc); setSelProfile(dp)
     } catch (e) { setError(String(e)) }
     finally { setDiscovering(false) }
@@ -144,7 +125,7 @@ export default function Contractors() {
   async function handleBulkImport() {
     const toImport = discovered
       .filter(u => !u.alreadyImported && u.taskmanUserId != null)
-      .map(u => ({ taskmanUserId: u.taskmanUserId!, name: u.name, company: selCompany[u.taskmanUserId!] ?? COMPANIES[0], profile: selProfile[u.taskmanUserId!] || null }))
+      .map(u => ({ taskmanUserId: u.taskmanUserId!, name: u.name, company: selCompany[u.taskmanUserId!] || companies[0]?.name || '', profile: selProfile[u.taskmanUserId!] || null }))
     if (!toImport.length) return
     setImporting(true); setError(null)
     try {
@@ -157,7 +138,14 @@ export default function Contractors() {
 
   const newToImport = discovered.filter(u => !u.alreadyImported && u.taskmanUserId != null)
   const needReingest = discovered.filter(u => u.taskmanUserId == null)
+  const [filterName, setFilterName] = useState('')
+  const [filterCompany, setFilterCompany] = useState('')
+
   const sorted = [...items].sort((a, b) => a.company.localeCompare(b.company) || a.name.localeCompare(b.name))
+  const filtered = sorted.filter(c =>
+    (!filterName || c.name.toLowerCase().includes(filterName.toLowerCase())) &&
+    (!filterCompany || c.company === filterCompany)
+  )
 
   return (
     <>
@@ -224,8 +212,9 @@ export default function Contractors() {
                           <td>{uid != null ? <span className="code-badge">#{uid}</span> : <span className="text-muted text-sm">—</span>}</td>
                           <td>
                             {uid == null || u.alreadyImported ? <span className="text-muted text-sm">—</span> : (
-                              <select value={selCompany[uid] ?? COMPANIES[0]} onChange={e => setSelCompany(p => ({ ...p, [uid]: e.target.value }))} style={{ width: 130 }}>
-                                {COMPANIES.map(c => <option key={c}>{c}</option>)}
+                              <select value={selCompany[uid] ?? ''} onChange={e => setSelCompany(p => ({ ...p, [uid]: e.target.value }))} style={{ width: 150 }}>
+                                <option value="">— select —</option>
+                                {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                               </select>
                             )}
                           </td>
@@ -233,7 +222,7 @@ export default function Contractors() {
                             {uid == null || u.alreadyImported ? <span className="text-muted text-sm">—</span> : (
                               <select value={selProfile[uid] ?? ''} onChange={e => setSelProfile(p => ({ ...p, [uid]: e.target.value }))} style={{ width: 100 }}>
                                 <option value="">—</option>
-                                {profilesFor(selCompany[uid] ?? COMPANIES[0]).map(p => <option key={p}>{p}</option>)}
+                                {profilesFor(selCompany[uid] ?? '').map(p => <option key={p}>{p}</option>)}
                               </select>
                             )}
                           </td>
@@ -261,51 +250,23 @@ export default function Contractors() {
           </div>
         </div>
 
-        {/* ── Rate cards ───────────────────────────────────────────────────────── */}
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div className="card-header"><h2>Rate Cards <span className="text-muted text-sm" style={{ fontWeight: 400 }}>(daily rate per company × profile)</span></h2></div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Company</th><th>Profile</th>
-                  <th className="num">Extra-muros €/day</th>
-                  <th className="num">Intra-muros €/day</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rateCards.length === 0 ? (
-                  <tr><td colSpan={5} className="empty-state">No rate cards yet — add one below.</td></tr>
-                ) : rateCards.map(rc => (
-                  <tr key={rc.id}>
-                    <td>{rc.company}</td>
-                    <td><span className="code-badge">{rc.profile}</span></td>
-                    <td className="num"><span className="eur">{eur(rc.dailyRateEur)}</span></td>
-                    <td className="num">{rc.intraMurosRateEur != null ? <span className="eur">{eur(rc.intraMurosRateEur)}</span> : <span className="text-muted">—</span>}</td>
-                    <td><button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDeleteRateCard(rc.id)}>Delete</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--clr-border)', background: 'var(--clr-bg)' }}>
-            <form onSubmit={handleSaveRateCard} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: 10, alignItems: 'end' }}>
-              <div>
-                <label>Company</label>
-                <select value={rcCompany} onChange={e => setRcCompany(e.target.value)}>{COMPANIES.map(c => <option key={c}>{c}</option>)}</select>
-              </div>
-              <div><label>Profile</label><input placeholder="e.g. P1" value={rcProfile} onChange={e => setRcProfile(e.target.value)} required /></div>
-              <div><label>Extra-muros €/day</label><input type="number" step="0.01" min="0" placeholder="0.00" value={rcDaily} onChange={e => setRcDaily(e.target.value)} required /></div>
-              <div><label>Intra-muros €/day</label><input type="number" step="0.01" min="0" placeholder="optional" value={rcIntra} onChange={e => setRcIntra(e.target.value)} /></div>
-              <button type="submit">Save Card</button>
-            </form>
-          </div>
-        </div>
-
         {/* ── Developers list ─────────────────────────────────────────────────── */}
         <div className="card">
-          <div className="card-header"><h2>Developers</h2></div>
+          <div className="card-header">
+            <h2>Developers <span className="text-muted text-sm" style={{ fontWeight: 400 }}>({filtered.length}{filtered.length !== sorted.length ? ` of ${sorted.length}` : ''})</span></h2>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                placeholder="Search by name…"
+                value={filterName}
+                onChange={e => setFilterName(e.target.value)}
+                style={{ width: 180 }}
+              />
+              <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} style={{ width: 160 }}>
+                <option value="">All companies</option>
+                {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -322,7 +283,9 @@ export default function Contractors() {
                   <tr><td colSpan={5} className="empty-state">Loading…</td></tr>
                 ) : sorted.length === 0 && !addingRow ? (
                   <tr><td colSpan={5} className="empty-state">No contractors yet — use Discover below or click "+ Add Manually".</td></tr>
-                ) : sorted.map(c => {
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={5} className="empty-state">No developers match the current filter.</td></tr>
+                ) : filtered.map(c => {
                   const card = rateFor(c)
                   const profiles = profilesFor(c.company)
                   return (
@@ -337,8 +300,11 @@ export default function Contractors() {
                         />
                       </td>
                       <td>
-                        <select value={c.company} onChange={e => handleCompanyChange(c, e.target.value)} style={{ width: 120 }}>
-                          {COMPANIES.map(co => <option key={co}>{co}</option>)}
+                        <select value={c.company} onChange={e => handleCompanyChange(c, e.target.value)} style={{ width: 140 }}>
+                          {companies.map(co => <option key={co.id} value={co.name}>{co.name}</option>)}
+                          {!companies.find(co => co.name === c.company) && (
+                            <option value={c.company}>{c.company}</option>
+                          )}
                         </select>
                       </td>
                       <td>
@@ -355,7 +321,7 @@ export default function Contractors() {
                           : <span className="text-muted text-sm">set profile →</span>}
                       </td>
                       <td>
-                        <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(c.id)}>Delete</button>
+                        <BinButton onClick={() => handleDelete(c.id)} />
                       </td>
                     </tr>
                   )
@@ -365,10 +331,11 @@ export default function Contractors() {
                 {addingRow && (
                   <tr>
                     <td colSpan={5} style={{ padding: 0 }}>
-                      <form onSubmit={handleAddSave} style={{ display: 'grid', gridTemplateColumns: '1fr 130px 110px 130px auto auto', gap: 6, padding: '8px 12px', background: 'var(--clr-bg-soft, #f8fafc)' }}>
+                      <form onSubmit={handleAddSave} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 110px 130px auto auto', gap: 6, padding: '8px 12px', background: 'var(--clr-bg-soft, #f8fafc)' }}>
                         <input placeholder="Name" value={newName} onChange={e => setNewName(e.target.value)} required autoFocus />
-                        <select value={newCompany} onChange={e => setNewCompany(e.target.value)}>
-                          {COMPANIES.map(c => <option key={c}>{c}</option>)}
+                        <select value={newCompany} onChange={e => setNewCompany(e.target.value)} required>
+                          <option value="">— company —</option>
+                          {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                         <select value={newProfile} onChange={e => setNewProfile(e.target.value)}>
                           <option value="">— profile —</option>

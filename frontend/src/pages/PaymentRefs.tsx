@@ -85,7 +85,7 @@ export default function PaymentRefs() {
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setSaving(true); setError(null)
-    const data = { fiscalYear: year, paymentRefId, description }
+    const data = { fiscalYear: year, paymentRefId, description, isActive: editItem?.isActive ?? true }
     try {
       if (editItem) await updatePaymentRef(editItem.id, data)
       else await createPaymentRef(data)

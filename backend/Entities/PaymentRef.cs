@@ -12,6 +12,7 @@ public class PaymentRef
     /// <summary>Matches Taskman's "Payment Reference ID" custom field, e.g. "es_bilbomatica-Natura2000-EEA/DTL/25/015/EEA.61006".</summary>
     public string PaymentRefId { get; set; } = "";
     public string Description { get; set; } = "";
+    public bool IsActive { get; set; } = true;
 
     public FiscalYear Year { get; set; } = null!;
     public ICollection<Appropriation> Appropriations { get; set; } = [];

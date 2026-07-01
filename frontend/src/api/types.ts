@@ -1,3 +1,8 @@
+export interface Company {
+  id: number
+  name: string
+}
+
 export interface FiscalYear {
   year: number
   status: string
@@ -8,6 +13,7 @@ export interface PaymentRef {
   fiscalYear: number
   paymentRefId: string
   description: string
+  isActive: boolean
 }
 
 export interface PaymentRefSummary {

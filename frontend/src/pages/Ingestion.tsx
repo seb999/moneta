@@ -164,7 +164,7 @@ export default function Ingestion() {
                         <label>Payment Ref</label>
                         <select value={refId} onChange={e => setRefId(e.target.value)}>
                           {paymentRefs.length === 0 && <option value="">— no refs —</option>}
-                          {paymentRefs.map(r => <option key={r.id} value={r.id}>{r.paymentRefId}</option>)}
+                          {paymentRefs.filter(r => r.isActive).map(r => <option key={r.id} value={r.id}>{r.paymentRefId}</option>)}
                         </select>
                         <p className="text-muted text-sm" style={{ marginTop: 4 }}>Re-ingests the projects this ref has appeared in.</p>
                       </div>

@@ -209,6 +209,29 @@ public class InvoicesController(MonetaDbContext db, IInvoiceExtractionService ex
         return Ok(ToDto(entity));
     }
 
+    /// <summary>Correct a disputed invoice and reset it to "received" for re-verification.</summary>
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, UpdateInvoiceRequest req)
+    {
+        var inv = await db.Invoices.FindAsync(id);
+        if (inv is null) return NotFound();
+        if (inv.Status == "verified") return Conflict("Verified invoices cannot be edited.");
+
+        var pref = await db.PaymentRefs.FindAsync(req.PaymentRefId);
+        if (pref is null) return BadRequest($"Payment ref {req.PaymentRefId} not found.");
+
+        inv.Consultant          = req.Consultant;
+        inv.InvoiceRef          = req.InvoiceRef;
+        inv.Period              = req.Period;
+        inv.PaymentRefId        = req.PaymentRefId;
+        inv.ClaimedAmountCents  = (long)Math.Round(req.ClaimedAmountEur * 100, MidpointRounding.AwayFromZero);
+        inv.Status              = "received";
+        inv.VerifiedBy          = null;
+        inv.VerifiedAt          = null;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {

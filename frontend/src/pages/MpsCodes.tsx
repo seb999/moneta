@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import BinButton from '../components/BinButton'
 import { getMpsCodes, getMpsMappings, getMpsUnmapped, importMpsBundled, importMpsFile, createMpsMapping, updateMpsMapping, deleteMpsMapping } from '../api/client'
 import { useYear } from '../contexts/YearContext'
 import type { MpsCode, CategoryMpsMap, MpsImportResult, UnmappedPair } from '../api/types'
@@ -216,7 +217,7 @@ export default function MpsCodes() {
                       <td>
                         <div className="flex-gap">
                           <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => openForm(m)}>Edit</button>
-                          <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDeleteMapping(m.id)}>Delete</button>
+                          <BinButton onClick={() => handleDeleteMapping(m.id)} />
                         </div>
                       </td>
                     </tr>

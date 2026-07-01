@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Moneta.Api.Infrastructure;
 
@@ -10,9 +11,11 @@ using Moneta.Api.Infrastructure;
 namespace Moneta.Api.Migrations
 {
     [DbContext(typeof(MonetaDbContext))]
-    partial class MonetaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701130711_AddPaymentRefIsActive")]
+    partial class AddPaymentRefIsActive
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -177,21 +180,6 @@ namespace Moneta.Api.Migrations
                     b.HasIndex("PaymentRefId");
 
                     b.ToTable("Commitments");
-                });
-
-            modelBuilder.Entity("Moneta.Api.Entities.Company", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Companies");
                 });
 
             modelBuilder.Entity("Moneta.Api.Entities.Contractor", b =>

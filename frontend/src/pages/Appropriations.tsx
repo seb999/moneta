@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { getAppropriations, getPaymentRefs, createAppropriation, updateAppropriation, deleteAppropriation } from '../api/client'
 import { eur } from '../api/format'
+import BinButton from '../components/BinButton'
 import { useYear } from '../contexts/YearContext'
 import type { Appropriation, PaymentRef } from '../api/types'
 
@@ -109,7 +110,7 @@ export default function Appropriations() {
                   <th className="num">CA (€)</th>
                   <th className="num">PA (€)</th>
                   <th>Effective</th>
-                  <th>Note</th>
+                  <th>MPS</th>
                   <th></th>
                 </tr>
               </thead>
@@ -151,7 +152,7 @@ export default function Appropriations() {
                             <td className="text-sm text-muted">{a.note ?? '—'}</td>
                             <td style={{ display: 'flex', gap: 6 }}>
                               <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => openEdit(a)}>Edit</button>
-                              <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(a.id)}>Delete</button>
+                              <BinButton onClick={() => handleDelete(a.id)} />
                             </td>
                           </tr>
                         ))}
@@ -175,7 +176,7 @@ export default function Appropriations() {
                 <div>
                   <label>Payment Ref</label>
                   <select value={paymentRefId} onChange={e => setPaymentRefId(e.target.value)} required>
-                    {refs.map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
+                    {refs.filter(r => r.isActive || String(r.id) === paymentRefId).map(r => <option key={r.id} value={r.id}>{r.paymentRefId} — {r.description}</option>)}
                   </select>
                 </div>
               </div>

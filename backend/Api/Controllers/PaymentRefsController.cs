@@ -62,7 +62,7 @@ public class PaymentRefsController(MonetaDbContext db, IRedmineClient redmine) :
         return await q
             .OrderBy(p => p.FiscalYear)
             .ThenBy(p => p.PaymentRefId)
-            .Select(p => new PaymentRefDto(p.Id, p.FiscalYear, p.PaymentRefId, p.Description))
+            .Select(p => new PaymentRefDto(p.Id, p.FiscalYear, p.PaymentRefId, p.Description, p.IsActive))
             .ToListAsync();
     }
 
@@ -121,7 +121,7 @@ public class PaymentRefsController(MonetaDbContext db, IRedmineClient redmine) :
     {
         var p = await db.PaymentRefs.FindAsync(id);
         return p is null ? NotFound()
-            : Ok(new PaymentRefDto(p.Id, p.FiscalYear, p.PaymentRefId, p.Description));
+            : Ok(new PaymentRefDto(p.Id, p.FiscalYear, p.PaymentRefId, p.Description, p.IsActive));
     }
 
     [HttpPost]
@@ -136,7 +136,7 @@ public class PaymentRefsController(MonetaDbContext db, IRedmineClient redmine) :
         var entity = new PaymentRef { FiscalYear = req.FiscalYear, PaymentRefId = req.PaymentRefId, Description = req.Description };
         db.PaymentRefs.Add(entity);
         await db.SaveChangesAsync();
-        var dto = new PaymentRefDto(entity.Id, entity.FiscalYear, entity.PaymentRefId, entity.Description);
+        var dto = new PaymentRefDto(entity.Id, entity.FiscalYear, entity.PaymentRefId, entity.Description, entity.IsActive);
         return CreatedAtAction(nameof(Get), new { id = entity.Id }, dto);
     }
 
@@ -147,6 +147,16 @@ public class PaymentRefsController(MonetaDbContext db, IRedmineClient redmine) :
         if (entity is null) return NotFound();
         entity.PaymentRefId  = req.PaymentRefId;
         entity.Description   = req.Description;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPatch("{id:int}/active")]
+    public async Task<IActionResult> SetActive(int id, [FromBody] SetActiveRequest req)
+    {
+        var entity = await db.PaymentRefs.FindAsync(id);
+        if (entity is null) return NotFound();
+        entity.IsActive = req.IsActive;
         await db.SaveChangesAsync();
         return NoContent();
     }

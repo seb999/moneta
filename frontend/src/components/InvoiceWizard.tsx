@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   extractInvoice, createInvoice, deleteInvoice, getInvoiceReadiness,
   ingestMonth, getSyncedProjects, getVerification, getSplit, verifyInvoice, disputeInvoice,
+  getCompanies,
 } from '../api/client'
 import { eur } from '../api/format'
-import type { PaymentRef, Readiness, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
+import type { Company, PaymentRef, Readiness, Verification, Split, MpsSplitLine, InvoiceLineInput } from '../api/types'
 import VerificationReview from './VerificationReview'
 import ExtractionProgress from './ExtractionProgress'
 
@@ -50,6 +51,9 @@ export default function InvoiceWizard(
   // Step 5/6 — decision
   const [note, setNote] = useState('')
   const [done, setDone] = useState<'verified' | 'disputed' | null>(null)
+
+  const [companies, setCompanies] = useState<Company[]>([])
+  useEffect(() => { getCompanies().then(setCompanies).catch(() => {}) }, [])
 
   const selectedRef = refs.find(r => String(r.id) === paymentRefId)
   const headerValid = !!consultant && !!invoiceRef && /^\d{4}-\d{2}$/.test(period) && !!paymentRefId && Number(amount) > 0
@@ -176,7 +180,13 @@ export default function InvoiceWizard(
           <div>
             {extractMsg && <p className="text-muted text-sm" style={{ marginBottom: 10 }}>{extractMsg}</p>}
             <div className="form-row cols-2">
-              <div><label>Consultant</label><input value={consultant} onChange={e => setConsultant(e.target.value)} /></div>
+              <div>
+                <label>Consultant</label>
+                <select value={consultant} onChange={e => setConsultant(e.target.value)}>
+                  <option value="">— select company —</option>
+                  {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
               <div><label>Invoice ref</label><input value={invoiceRef} onChange={e => setInvoiceRef(e.target.value)} /></div>
             </div>
             <div className="form-row cols-2">
