@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { getAppropriations, getPaymentRefs, createAppropriation, updateAppropriation, deleteAppropriation } from '../api/client'
 import { eur } from '../api/format'
 import { useYear } from '../contexts/YearContext'
@@ -13,6 +13,15 @@ export default function Appropriations() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  function toggle(code: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code); else next.add(code)
+      return next
+    })
+  }
 
   const [paymentRefId, setPaymentRefId] = useState('')
   const [caAmount, setCaAmount] = useState('')
@@ -109,21 +118,47 @@ export default function Appropriations() {
                   <tr><td colSpan={8} className="empty-state">Loading…</td></tr>
                 ) : items.length === 0 ? (
                   <tr><td colSpan={8} className="empty-state">No appropriations for {year}.</td></tr>
-                ) : items.map(a => (
-                  <tr key={a.id}>
-                    <td><span className="code-badge" style={{ fontFamily: 'monospace', fontSize: 11 }}>{a.paymentRefCode}</span></td>
-                    <td className="text-sm text-muted">{a.source}</td>
-                    <td><span className="code-badge">{a.creditOrigin}</span></td>
-                    <td className="num"><span className="eur">{eur(a.caAmountEur)}</span></td>
-                    <td className="num"><span className="eur">{eur(a.paAmountEur)}</span></td>
-                    <td className="text-sm text-muted">{a.effectiveDate}</td>
-                    <td className="text-sm text-muted">{a.note ?? '—'}</td>
-                    <td style={{ display: 'flex', gap: 6 }}>
-                      <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => openEdit(a)}>Edit</button>
-                      <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(a.id)}>Delete</button>
-                    </td>
-                  </tr>
-                ))}
+                ) : (() => {
+                  const groups = new Map<string, Appropriation[]>()
+                  for (const a of items) {
+                    if (!groups.has(a.paymentRefCode)) groups.set(a.paymentRefCode, [])
+                    groups.get(a.paymentRefCode)!.push(a)
+                  }
+                  return [...groups.entries()].map(([code, groupItems]) => {
+                    const open = !collapsed.has(code)
+                    const totalCa = groupItems.reduce((s, a) => s + a.caAmountEur, 0)
+                    const totalPa = groupItems.reduce((s, a) => s + a.paAmountEur, 0)
+                    return (
+                      <Fragment key={code}>
+                        <tr onClick={() => toggle(code)} style={{ cursor: 'pointer', background: 'var(--clr-bg-soft, #f8fafc)', userSelect: 'none' }}>
+                          <td colSpan={3}>
+                            <span style={{ marginRight: 6, fontSize: 10, color: 'var(--clr-muted)' }}>{open ? '▼' : '▶'}</span>
+                            <span className="code-badge" style={{ fontFamily: 'monospace', fontSize: 11 }}>{code}</span>
+                            <span className="text-muted text-sm" style={{ marginLeft: 8 }}>{groupItems.length} {groupItems.length === 1 ? 'entry' : 'entries'}</span>
+                          </td>
+                          <td className="num" style={{ fontWeight: 600 }}><span className="eur">{eur(totalCa)}</span></td>
+                          <td className="num" style={{ fontWeight: 600 }}><span className="eur">{eur(totalPa)}</span></td>
+                          <td colSpan={3}></td>
+                        </tr>
+                        {open && groupItems.map(a => (
+                          <tr key={a.id}>
+                            <td></td>
+                            <td className="text-sm text-muted">{a.source}</td>
+                            <td><span className="code-badge">{a.creditOrigin}</span></td>
+                            <td className="num"><span className="eur">{eur(a.caAmountEur)}</span></td>
+                            <td className="num"><span className="eur">{eur(a.paAmountEur)}</span></td>
+                            <td className="text-sm text-muted">{a.effectiveDate}</td>
+                            <td className="text-sm text-muted">{a.note ?? '—'}</td>
+                            <td style={{ display: 'flex', gap: 6 }}>
+                              <button className="secondary" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => openEdit(a)}>Edit</button>
+                              <button className="danger" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => handleDelete(a.id)}>Delete</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    )
+                  })
+                })()}
               </tbody>
             </table>
           </div>
