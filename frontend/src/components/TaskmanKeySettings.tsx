@@ -15,17 +15,15 @@ export default function TaskmanKeySettings() {
 
   function openModal() { setDraft(getTaskmanKey()); setOpen(true) }
   function save() { setTaskmanKey(draft); setOpen(false) }
-  function useDefault() { setTaskmanKey(''); setOpen(false) }
-
   return (
     <>
       <button
         className="secondary"
         onClick={openModal}
-        title={key ? 'Your Taskman key is set' : 'Using the default Taskman key'}
+        title={key ? 'Your Taskman key is set' : 'No Taskman key set'}
         style={{ width: '100%', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
-        <span style={{ width: 7, height: 7, borderRadius: 999, background: key ? 'var(--clr-green)' : 'var(--clr-muted)' }} />
+        <span style={{ width: 7, height: 7, borderRadius: 999, background: key ? 'var(--clr-green)' : 'var(--clr-danger)' }} />
         Taskman Key
       </button>
 
@@ -34,8 +32,8 @@ export default function TaskmanKeySettings() {
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <h3>Taskman API Key</h3>
             <p className="text-muted text-sm" style={{ marginBottom: 16 }}>
-              Moneta uses your Taskman key for all Taskman operations (ingestion, discovery, and the assistant).
-              Stored in this browser only. Leave blank to use the app's default key.
+              Required for ingestion, discovery, and the assistant. Find it in Taskman → My account → API access key.
+              Stored in this browser only.
             </p>
             <div className="form-row">
               <div>
@@ -50,8 +48,8 @@ export default function TaskmanKeySettings() {
               </div>
             </div>
             <div className="form-actions">
-              <button type="button" className="secondary" onClick={useDefault}>Use default key</button>
-              <button type="button" onClick={save}>Save</button>
+              <button type="button" className="secondary" onClick={() => setOpen(false)}>Cancel</button>
+              <button type="button" onClick={save} disabled={!draft.trim()}>Save</button>
             </div>
           </div>
         </div>
