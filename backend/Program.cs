@@ -4,6 +4,32 @@ using Moneta.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Accept flat, UPPER_SNAKE env-file names (e.g. OPENAI_API_KEY) as aliases for the
+// nested config keys the app reads (OpenAI:ApiKey). Lets `docker run --env-file`
+// use the same variable names as docker-compose. Nested keys (appsettings /
+// OpenAI__ApiKey) still win when both are present.
+var envAliases = new Dictionary<string, string>
+{
+    ["OPENAI_API_KEY"]          = "OpenAI:ApiKey",
+    ["OPENAI_BASE_URL"]         = "OpenAI:BaseUrl",
+    ["OPENAI_MODEL"]            = "OpenAI:Model",
+    ["OPENAI_EXTRACTION_MODEL"] = "OpenAI:ExtractionModel",
+    ["TASKMAN_API_KEY"]         = "Taskman:ApiKey",
+    ["TASKMAN_BASE_URL"]        = "Taskman:BaseUrl",
+    ["TASKMAN_MCP_URL"]         = "TaskmanMcp:Url",
+    ["TASKMAN_MCP_API_KEY"]     = "TaskmanMcp:ApiKey",
+};
+var aliased = new Dictionary<string, string?>();
+foreach (var (flat, nested) in envAliases)
+{
+    // Only fill the nested key from the flat env var when the nested key isn't already set.
+    var value = Environment.GetEnvironmentVariable(flat);
+    if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(builder.Configuration[nested]))
+        aliased[nested] = value;
+}
+if (aliased.Count > 0)
+    builder.Configuration.AddInMemoryCollection(aliased);
+
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient(); // default + named clients for chat/MCP

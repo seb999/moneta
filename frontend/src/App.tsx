@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { YearProvider } from './contexts/YearContext'
+import AuthGate from './components/AuthGate'
 import Layout from './components/Layout'
 import BudgetOverview from './pages/BudgetOverview'
 import PaymentRefs from './pages/PaymentRefs'
@@ -16,9 +17,10 @@ import FiscalYears from './pages/FiscalYears'
 
 export default function App() {
   return (
-    <YearProvider>
-      <BrowserRouter>
-        <Routes>
+    <AuthGate>
+      <YearProvider>
+        <BrowserRouter>
+          <Routes>
           <Route element={<Layout />}>
             <Route index element={<BudgetOverview />} />
             <Route path="payment-refs" element={<PaymentRefs />} />
@@ -33,8 +35,9 @@ export default function App() {
             <Route path="mps-codes" element={<MpsCodes />} />
             <Route path="fiscal-years" element={<FiscalYears />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
-    </YearProvider>
+          </Routes>
+        </BrowserRouter>
+      </YearProvider>
+    </AuthGate>
   )
 }

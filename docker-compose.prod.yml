@@ -12,8 +12,8 @@ services:
       Taskman__ApiKey: "${TASKMAN_API_KEY:-}"
       OpenAI__ApiKey: "${OPENAI_API_KEY:-}"
       OpenAI__BaseUrl: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-      OpenAI__Model: "${OPENAI_MODEL:-gpt-5.2}"
-      OpenAI__ExtractionModel: "${OPENAI_EXTRACTION_MODEL:-gpt-4o}"
+      OpenAI__Model: "${OPENAI_MODEL:-gpt-5.4}"
+      OpenAI__ExtractionModel: "${OPENAI_EXTRACTION_MODEL:-gpt-5.4}"
       TaskmanMcp__Url: "${TASKMAN_MCP_URL:-}"
       TaskmanMcp__ApiKey: "${TASKMAN_MCP_API_KEY:-}"
     volumes:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getTaskmanKey, setTaskmanKey, hasBeenAsked, subscribeTaskmanKey } from '../api/taskmanKey'
+import { getTaskmanKey, setTaskmanKey, subscribeTaskmanKey } from '../api/taskmanKey'
 
 export default function TaskmanKeySettings() {
   const [key, setKey] = useState(getTaskmanKey())
@@ -7,11 +7,6 @@ export default function TaskmanKeySettings() {
   const [draft, setDraft] = useState('')
 
   useEffect(() => subscribeTaskmanKey(setKey), [])
-
-  // Prompt once at startup if no key has ever been set/dismissed
-  useEffect(() => {
-    if (!getTaskmanKey() && !hasBeenAsked()) { setDraft(''); setOpen(true) }
-  }, [])
 
   function openModal() { setDraft(getTaskmanKey()); setOpen(true) }
   function save() { setTaskmanKey(draft); setOpen(false) }

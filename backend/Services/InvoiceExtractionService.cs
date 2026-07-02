@@ -87,7 +87,7 @@ public class InvoiceExtractionService(IConfiguration config, IHttpClientFactory 
             throw new InvalidOperationException("OpenAI API key is not configured (OpenAI:ApiKey).");
 
         var baseUrl = (config["OpenAI:BaseUrl"] ?? "https://api.openai.com/v1").TrimEnd('/');
-        var model   = config["OpenAI:Model"] ?? config["OpenAI:ExtractionModel"] ?? "gpt-4o";
+        var model   = config["OpenAI:ExtractionModel"] ?? config["OpenAI:Model"] ?? "gpt-5.4";
         var base64  = Convert.ToBase64String(pdfBytes);
 
         var payload = new JsonObject

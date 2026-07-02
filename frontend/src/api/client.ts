@@ -24,6 +24,9 @@ export const getCompanies = () => request<Company[]>('/companies')
 export const createCompany = (name: string) => request<Company>('/companies', { method: 'POST', body: JSON.stringify({ name }) })
 export const deleteCompany = (id: number) => request<void>(`/companies/${id}`, { method: 'DELETE' })
 
+// Health / auth
+export const validateTaskmanKey = () => request<{ valid: boolean }>('/health/taskman')
+
 // Fiscal Years
 export const getFiscalYears = () => request<FiscalYear[]>('/fiscal-years')
 export const createFiscalYear = (year: number, status = 'open') =>

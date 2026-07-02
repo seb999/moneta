@@ -70,7 +70,7 @@ public class ChatController(
             return;
         }
         var baseUrl = (config["OpenAI:BaseUrl"] ?? "https://api.openai.com/v1").TrimEnd('/');
-        var model = config["OpenAI:Model"] ?? "gpt-4o";
+        var model = config["OpenAI:Model"] ?? "gpt-5.4";
 
         // Connect to the Taskman MCP server (graceful degradation)
         McpSession? mcp = null;

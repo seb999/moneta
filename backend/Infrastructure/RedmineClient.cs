@@ -6,6 +6,7 @@ namespace Moneta.Api.Infrastructure;
 
 public interface IRedmineClient
 {
+    Task<bool> ValidateKeyAsync(CancellationToken ct = default);
     Task<List<RedmineProject>> GetProjectsAsync(CancellationToken ct = default);
     Task<List<RedmineTimeEntry>> GetTimeEntriesAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct = default);
     Task<Dictionary<int, RedmineIssue>> GetIssuesByIdsAsync(IEnumerable<int> issueIds, CancellationToken ct = default);
@@ -28,6 +29,21 @@ public class RedmineClient : IRedmineClient
             http.DefaultRequestHeaders.Remove("X-Redmine-API-Key");
         if (!string.IsNullOrWhiteSpace(key))
             http.DefaultRequestHeaders.Add("X-Redmine-API-Key", key);
+    }
+
+    /// <summary>True if the current key authenticates against Taskman (Redmine /users/current).</summary>
+    public async Task<bool> ValidateKeyAsync(CancellationToken ct = default)
+    {
+        if (!http.DefaultRequestHeaders.Contains("X-Redmine-API-Key")) return false;
+        try
+        {
+            using var resp = await http.GetAsync("/users/current.json", ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<List<RedmineProject>> GetProjectsAsync(CancellationToken ct = default)
